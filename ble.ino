@@ -21,15 +21,9 @@ BLECharacteristic pwrMeasChar = BLECharacteristic(UUID16_CHR_CYCLING_POWER_MEASU
 BLECharacteristic pwrFeatChar = BLECharacteristic(UUID16_CHR_CYCLING_POWER_FEATURE);
 BLECharacteristic pwrLocChar  = BLECharacteristic(UUID16_CHR_SENSOR_LOCATION);
 
-/*
- * A made up service to help development. ---> THIJS: Replaced by bleuart service (to be removed!!)
- */
-BLEService        logService = BLEService(0x6E400001B5A3F393E0A9E50E24DCCA9E);
-BLECharacteristic logChar    = BLECharacteristic(0x6E400002B5A3F393E0A9E50E24DCCA9E);
-
 BLEDis bledis;    // DIS (Device Information Service) helper class instance
 BLEBas blebas;    // BAS (Battery Service) helper class instance
-BLEUart bleuart; // uart over ble
+BLEUart bleuart;  // UART over BLE 
 
 void bleSetup() {
   Bluefruit.begin();
@@ -77,7 +71,6 @@ void startAdv(void) {
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addService(pwrService);
 #ifdef BLE_LOGGING
-  Bluefruit.Advertising.addService(logService);
   Bluefruit.Advertising.addService(bleuart);
 #endif
   Bluefruit.Advertising.addName();
@@ -150,23 +143,6 @@ void setupPwr(void) {
   // Set location to "left crank"
   pwrLocChar.write8(5);
 }
-
-/*
- * This service exists only to publish logs over BLE.
- */
-#ifdef BLE_LOGGING
-void setupBleLogger() {
-  logService.begin();
-
-  // Has nothing to do with any spec.
-  logChar.setProperties(CHR_PROPS_NOTIFY);
-  // First param is the read permission, second is write.
-  logChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
-  // Payload is quite limited in BLE, so come up with good logging shorthand.
-  logChar.setMaxLen(20);
-  logChar.begin();
-}
-#endif
 
 void bleuart_data_transfer() {
   // Forward data from HW Serial to BLEUART

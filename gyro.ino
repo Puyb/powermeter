@@ -4,7 +4,6 @@
  * TODO big improvements I think to use the sleep mode and interrupts provided
  * by this MPU.
  */
-#include <Arduino_nRF5x_lowPower.h> // LowPower Library for nRF5x
 #include <wiring.h>
 
 #define BOARD_PIN_A4 = 2 // see pin mapping below
@@ -191,12 +190,10 @@ void gyroCheckSleepy() {
 
     pinMode(GYRO_INT_PIN, INPUT); */
 //    attachInterrupt(digitalPinToInterrupt(GYRO_INT_PIN), WakeUp, RISING);
-//    nRF5x_lowPower.enableWakeupByInterrupt(GYRO_INT_PIN, RISING);
     nrf_gpio_cfg_input(2,NRF_GPIO_PIN_NOPULL); //Configure button as input
     nrf_gpio_cfg_sense_input(2, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
     sd_power_system_off();
 //    NRF_POWER->SYSTEMOFF = 1; // SYSTEM OFF mode #1
-//    nRF5x_lowPower.powerMode(POWER_MODE_OFF);
   }
 }
 

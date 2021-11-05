@@ -74,35 +74,14 @@ void setup() {
   pinMode(LED_CONN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
 
-  delay(1000);
-
-  Serial.println("Starting up..");
-
-//  reset_MPU6050();
-  // Setup, calibrate our other components
   // Setup, calibrate our other components
   gyroSetup();
   loadSetup();
   bleSetup();
 
-#ifndef DISABLE_LOGGING
-  // Setup our SD logger, if present.
-  while (!SD.begin(SD_CS_PIN)) {
-    Serial.println("Failed to find SD card, not present");
-    delay(1000);
-  }
-#endif
-
-#ifdef DEBUG
-  // The F Macro stores strings in flash (program space) instead of RAM
-  Serial.println(F("All setup complete."));
-#endif
-
   // Setup sleep
   Sleepy = 1;
   timeFirstSleepCheck=millis();
-  Serial.println("Low-power mode will be activated after timeout.");
-
 }
 
 void loop() {
