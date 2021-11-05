@@ -1,9 +1,12 @@
 This is the complete code for a crank-based power meter, transmitting over BLE
 to a bike computer. The whole project is copied from Steve Jarvis website/gitlab. 
 Initally I've added a sleep mode for Feather Express (nRF52840) boards.
-- Thijs
+
+Thijs
+
 
 Original text from Steve Jarvis:
+
 Schematics and a part list for the hardware, as well as 
 notes on calibrating, are on [the wiki](https://gitlab.com/sjarvis/powermeter/-/wikis/home).
 In all, it's a full instruction set for building your own cycling power meter,
