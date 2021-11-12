@@ -1,6 +1,23 @@
 This is the complete code for a crank-based power meter, transmitting over BLE
 to a bike computer. The whole project is copied from Steve Jarvis website/gitlab. 
 
+Requirements:
+-   Building these sources requires 'Adafruit nRF52' by Adafruit version 0.9.3 in the 
+    Arduino IDE 'Boards Manager'. Then select 'Adafruit Bluefruit nRF52840 Feather Express' board 
+    under 'Tools'.
+-   These sources currently require a Adafruit Feather nRF52 Feather Express board (DFU button for
+    calibration and pinout for gyro wakeup interrupt)
+
+IMPLEMENTED:
+- Reading of load and gyro sensors (by  Steve Jarvis)
+- Connecting and updating load and gyro info to bluetooth device (by Steve Jarvis)
+- UART over bluetooth to enable connection via the Adafruit Bluefruit LE connect App (iOS/Android)
+- Sleep + wakeup by gyro motion
+- Integrated calibration, including persistant storage and retrieval via NVRAM (WORK IN PROGRESS!!)
+
+TODO: 
+- Upgrade board to latest version of Adafruit nRF52 board version (requires updates of BLE)
+- Remove Feather Express dependency (basically just the additional PIN_DFU button for callibration)
 
 Thijs
 

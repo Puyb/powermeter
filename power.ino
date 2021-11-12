@@ -1,14 +1,20 @@
 /**
    Main
+   ====
+
 */
 
 #include <Wire.h>
 #include <bluefruit.h>
 //#include <SD.h>
 #include <SPI.h>
+#include <Adafruit_NeoPixel.h>
 
 #include "MPU6050.h"
 #include "HX711.h"
+#include "nrf_nvmc.h"
+#include "board.h"
+
 
 // Virtufit Etappe I
 //#define DEBUG
@@ -58,6 +64,16 @@
 volatile long timeFirstSleepCheck=0;
 volatile long Sleepy=0;
 
+// NVRAM settings_struct (used by calibration)
+#define NVRAM_SETTINGS_PAGE_ADDR 0x00020000
+typedef struct settings_struct {
+  uint8_t calibrated; // NVRAM.cpp writes 0xff here if NVRAM is empty => not calibated yet
+
+  int gyro_offset = 0;
+  long load_offset = 0;
+  float load_multiplier = 0;
+} nvram_settings_struct;
+nvram_settings_struct nvram_settings;
 
 MPU6050 gyro;
 HX711 load;
@@ -70,6 +86,7 @@ void setup() {
   timeFirstSleepCheck=0;
   Sleepy = 0;
 
+  pinMode(BOARD_PIN_DFU, INPUT); // DFU button
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(LED_CONN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
@@ -78,10 +95,7 @@ void setup() {
   gyroSetup();
   loadSetup();
   bleSetup();
-
-  // Setup sleep
-  Sleepy = 1;
-  timeFirstSleepCheck=millis();
+//  calibrateSetup();
 }
 
 void loop() {
@@ -219,13 +233,18 @@ void loop() {
   }
 
 
+if(DFU_button_pressed()) {
+  calibrateSetup();
+//  calibrate_load_sensor();
+}
+
 // Pass-through USB/Bluethooth (BLE) data
-  bleuart_data_transfer();
+bleuart_data_transfer();
 
 // Should we go to sleep?
-  gyroCheckSleepy();
+gyroCheckSleepy();
 
-  delay(LOOP_DELAY);
+delay(LOOP_DELAY);
 
   // Request CPU to enter low-power mode until an event/interrupt occurs
 //  waitForEvent();

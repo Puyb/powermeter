@@ -51,16 +51,8 @@ void bleSetup() {
   // BLEService and BLECharacteristic classes
   setupPwr();
 
-#ifdef BLE_LOGGING
-  setupBleLogger();
-#endif
-
   // Setup the advertising packet(s)
   startAdv();
-
-#ifdef DEBUG
-  Serial.println("BLE module configured and advertising.");
-#endif
 }
 
 void startAdv(void) {
@@ -164,6 +156,7 @@ void bleuart_data_transfer() {
     Serial.write(ch);
   }
 }
+
 /*
  * Publish the instantaneous power measurement.
  */
@@ -239,37 +232,6 @@ void blePublishBatt(uint8_t battPercent) {
   Serial.printf("Updated battery percentage to %d", battPercent);
 #endif
 }
-
-/*
- * Publish a tiny little log message over BLE. Pass a null-terminated
- * char*, in 20 chars or less (counting the null).
- */
-#ifdef BLE_LOGGING
-void blePublishLog(const char* fmt, ...) {
-  static const short MAX = 20;  // 19 chars plus the null terminator
-  static char msg[MAX];
-
-  va_list args;
-  va_start(args, fmt);
-  int numBytes = vsprintf(msg, fmt, args);
-  va_end(args);
-
-  if (numBytes < 0) {
-    Serial.println("Failed to write BLE log to buffer");
-  } else if (numBytes > MAX) {
-    Serial.printf("Too many bytes written (%d), overflowed the msg buffer.\n", numBytes);
-    Serial.printf("Original message: %s\n", msg);
-  } else {
-    bool ret = bleuart.write(msg, numBytes);
-    if (ret) {
-      bleuart.write("\n",1);
-      Serial.printf("Sent log %d byte message: %s\n", ret, msg);
-    } else {
-      Serial.println("Failed to publish log message over BLE.");
-    }
-  }
-}
-#endif
 
 void connectCallback(uint16_t connHandle) {
   char centralName[32] = { 0 };
