@@ -1,6 +1,6 @@
 This is the complete code for a crank-based power meter, transmitting over BLE
 to a bike computer. The whole project is copied from Steve Jarvis website/gitlab. 
-Initally I've added a sleep mode for Feather Express (nRF52840) boards.
+
 
 Thijs
 
