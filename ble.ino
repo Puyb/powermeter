@@ -21,17 +21,20 @@ BLECharacteristic pwrMeasChar = BLECharacteristic(UUID16_CHR_CYCLING_POWER_MEASU
 BLECharacteristic pwrFeatChar = BLECharacteristic(UUID16_CHR_CYCLING_POWER_FEATURE);
 BLECharacteristic pwrLocChar  = BLECharacteristic(UUID16_CHR_SENSOR_LOCATION);
 
+BLEDfu bledfu;    // OTA DFU service
 BLEDis bledis;    // DIS (Device Information Service) helper class instance
 BLEBas blebas;    // BAS (Battery Service) helper class instance
 BLEUart bleuart;  // UART over BLE 
+//BLEPeriph bleperiph; // peripheral role's connection
+//BLEConnection blecon; // replacing several Bluefruit functions
 
 void bleSetup() {
   Bluefruit.begin();
   Bluefruit.setName(DEV_NAME);
 
   // Set the connect/disconnect callback handlers
-  Bluefruit.setConnectCallback(connectCallback);
-  Bluefruit.setDisconnectCallback(disconnectCallback);
+  Bluefruit.Periph.setConnectCallback(connectCallback);
+  Bluefruit.Periph.setDisconnectCallback(disconnectCallback);
 
   // off Blue LED for lowest power consumption
   Bluefruit.autoConnLed(false);
@@ -106,7 +109,7 @@ void setupPwr(void) {
   // 4 total bytes, 2 16-bit values
   pwrMeasChar.setFixedLen(4);
   // Optionally capture Client Characteristic Config Descriptor updates
-  pwrMeasChar.setCccdWriteCallback(cccdCallback);
+  //pwrMeasChar.setCccdWriteCallback(cccdCallback);
   pwrMeasChar.begin();
 
   /*
@@ -234,8 +237,11 @@ void blePublishBatt(uint8_t battPercent) {
 }
 
 void connectCallback(uint16_t connHandle) {
+  // Get the reference to current connection
+  BLEConnection* connection = Bluefruit.Connection(connHandle);  
   char centralName[32] = { 0 };
-  Bluefruit.Gap.getPeerName(connHandle, centralName, sizeof(centralName));
+  
+  connection->getPeerName(centralName, sizeof(centralName));
 
   // Light up our 'connected' LED
   digitalWrite(LED_PIN, HIGH);
@@ -264,6 +270,7 @@ void disconnectCallback(uint16_t connHandle, uint8_t reason) {
 #endif
 }
 
+/*
 void cccdCallback(BLECharacteristic& chr, uint16_t cccdValue) {
 #ifdef DEBUG
   // Display the raw request packet
@@ -279,7 +286,7 @@ void cccdCallback(BLECharacteristic& chr, uint16_t cccdValue) {
     }
   }
 #endif
-}
+} */
 
 /*
  * Given a 16-bit uint16_t, convert it to 2 8-bit ints, and set

@@ -123,7 +123,7 @@ void calibrate_load_sensor() {
   Serial.printf("Load multiplier for HX711 library = %f\n", nvram_settings.load_multiplier);
 
 //  nrfx_nvmc_page_erase(NVRAM_SETTINGS_PAGE_ADDR);
-//  nrfx_nvmc_bytes_write((uint8_t *)&nvram_settings, NVRAM_SETTINGS_PAGE_ADDR, sizeof(nvram_settings));
+//  nrfx_nvmc_bytes_write((unsigned char *)&nvram_settings, NVRAM_SETTINGS_PAGE_ADDR, sizeof(nvram_settings));
 
   Serial.println("Calibration finished.");
   delay(5000);

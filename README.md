@@ -5,6 +5,10 @@ Requirements:
 -   Building these sources requires 'Adafruit nRF52' by Adafruit version 0.9.3 in the 
     Arduino IDE 'Boards Manager'. Then select 'Adafruit Bluefruit nRF52840 Feather Express' board 
     under 'Tools'.
+-  Libraries
+   - HX711 by Rob Tillaart (0.2.3)
+   - Adafruit NeoPixel by Adafruit (1.10.0)
+   - ArduinoBLE by Arduino (1.2.1)
 -   These sources currently require a Adafruit Feather nRF52 Feather Express board (DFU button for
     calibration and pinout for gyro wakeup interrupt)
 
@@ -13,6 +17,7 @@ IMPLEMENTED:
 - Connecting and updating load and gyro info to bluetooth device (by Steve Jarvis)
 - UART over bluetooth to enable connection via the Adafruit Bluefruit LE connect App (iOS/Android)
 - Sleep + wakeup by gyro motion
+- Upgrade to latest Adafruit nRF52 version (supporting BLE multi)
 - Integrated calibration, including persistant storage and retrieval via NVRAM (WORK IN PROGRESS!!)
 
 TODO: 

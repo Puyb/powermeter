@@ -6,6 +6,7 @@
 
 #include <Wire.h>
 #include <bluefruit.h>
+//#include <ArduinoBLE.h>
 //#include <SD.h>
 #include <SPI.h>
 #include <Adafruit_NeoPixel.h>
@@ -67,7 +68,7 @@ volatile long Sleepy=0;
 // NVRAM settings_struct (used by calibration)
 #define NVRAM_SETTINGS_PAGE_ADDR 0x00020000
 typedef struct settings_struct {
-  uint8_t calibrated; // NVRAM.cpp writes 0xff here if NVRAM is empty => not calibated yet
+  unsigned char calibrated; // NVRAM.cpp writes 0xff here if NVRAM is empty => not calibated yet
 
   int gyro_offset = 0;
   long load_offset = 0;
