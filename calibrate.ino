@@ -31,100 +31,136 @@ Same idea, run the programmed calibration and see what offset it comes up with.
 
 */
 
+void calibrateLoadCell() {
+  Serial.println("***");
+  Serial.println("Start calibration:");
+  Serial.println("Place the load cell an a level stable surface.");
+  Serial.println("Remove any load applied to the load cell.");
+  Serial.println("Send 't' from serial monitor to set the tare offset.");
 
-#define NUM_PIXELS 1
-
-Adafruit_NeoPixel pixel(NUM_PIXELS, PIN_NEOPIXEL, NEO_GRB);
-
-
-// Check if calibration-button is pressed
-bool DFU_button_pressed() {
-  if(digitalRead(BOARD_PIN_DFU) == LOW) {
-    digitalWrite(LED_BUILTIN, LOW);
-
-    // Wait for calibration-button to be released
-    while(digitalRead(BOARD_PIN_DFU) == LOW) {
+  boolean _resume = false;
+  while (_resume == false) {
+    LoadCell.update();
+    if (Serial.available() > 0) {
+      if (Serial.available() > 0) {
+        char inByte = Serial.read();
+        if (inByte == 't') LoadCell.tareNoDelay();
+      }
     }
-    digitalWrite(LED_BUILTIN, HIGH);
-    return true;
+    if (LoadCell.getTareStatus() == true) {
+      Serial.println("Tare complete");
+      _resume = true;
+    }
   }
-  else {
-    return false;
+
+  Serial.println("Now, place your known mass on the loadcell.");
+  Serial.println("Then send the weight of this mass (i.e. 100.0) from serial monitor.");
+
+  float known_mass = 0;
+  _resume = false;
+  while (_resume == false) {
+    LoadCell.update();
+    if (Serial.available() > 0) {
+      known_mass = Serial.parseFloat();
+      if (known_mass != 0) {
+        Serial.print("Known mass is: ");
+        Serial.println(known_mass);
+        _resume = true;
+      }
+    }
   }
+
+  LoadCell.refreshDataSet(); //refresh the dataset to be sure that the known mass is measured correct
+  float newCalibrationValue = LoadCell.getNewCalibration(known_mass); //get the new calibration value
+
+  Serial.print("New calibration value has been set to: ");
+  Serial.print(newCalibrationValue);
+  Serial.println(", use this as calibration value (calFactor) in your project sketch.");
+  Serial.print("Save this value to EEPROM adress ");
+  Serial.print(calVal_eepromAdress);
+  Serial.println("? y/n");
+
+  _resume = false;
+  while (_resume == false) {
+    if (Serial.available() > 0) {
+      char inByte = Serial.read();
+      if (inByte == 'y') {
+#if defined(ESP8266)|| defined(ESP32) || defined(AVR)
+        EEPROM.begin(512);
+        EEPROM.put(calVal_eepromAdress, newCalibrationValue);
+        EEPROM.commit();
+        EEPROM.get(calVal_eepromAdress, newCalibrationValue);
+        Serial.print("Value ");
+        Serial.print(newCalibrationValue);
+        Serial.print(" saved to EEPROM address: ");
+        Serial.println(calVal_eepromAdress);
+#else
+        Serial.println("EEPROM not supported on this platform");	
+#endif
+        _resume = true;
+
+      }
+      else if (inByte == 'n') {
+        Serial.println("Value not saved to EEPROM");
+        _resume = true;
+      }
+    }
+  }
+
+  Serial.println("End calibration");
+  Serial.println("***");
+  Serial.println("To re-calibrate, send 'c' from serial monitor.");
+  Serial.println("***");
 }
 
-void neopixel_flash(int n) {
-  pixel.begin();
-
-  for (int i = 0; i < n; i++) {
-    pixel.setPixelColor(0, 0, 0, 0);
-    pixel.show();
-    delay(500);
-    pixel.setPixelColor(0, 255, 0, 0);
-    pixel.show();
-    delay(100);
+void changeSavedCalFactor() {
+  float oldCalibrationValue = LoadCell.getCalFactor();
+  boolean _resume = false;
+  Serial.println("***");
+  Serial.print("Current value is: ");
+  Serial.println(oldCalibrationValue);
+  Serial.println("Now, send the new value from serial monitor, i.e. 696.0");
+  float newCalibrationValue;
+  while (_resume == false) {
+    if (Serial.available() > 0) {
+      newCalibrationValue = Serial.parseFloat();
+      if (newCalibrationValue != 0) {
+        Serial.print("New calibration value is: ");
+        Serial.println(newCalibrationValue);
+        LoadCell.setCalFactor(newCalibrationValue);
+        _resume = true;
+      }
+    }
   }
-}
-
-void calibrateSetup() {
-  // read settings from NVRAM
- 
-//  memcpy(&nvram_settings, NVRAM_SETTINGS_PAGE_ADDR, sizeof(nvram_settings));
-  if(nvram_settings.calibrated == 0xff) {
-    Serial.println("Please calibrate first");
+  _resume = false;
+  Serial.print("Save this value to EEPROM adress ");
+  Serial.print(calVal_eepromAdress);
+  Serial.println("? y/n");
+  while (_resume == false) {
+    if (Serial.available() > 0) {
+      char inByte = Serial.read();
+      if (inByte == 'y') {
+        Serial.print("New calibration Value ");
+        Serial.print(newCalibrationValue);
+        Serial.println("");
+#if defined(ESP8266)|| defined(ESP32)
+        EEPROM.begin(512);
+        EEPROM.put(calVal_eepromAdress, newCalibrationValue);
+        EEPROM.commit();
+        EEPROM.get(calVal_eepromAdress, newCalibrationValue);
+        Serial.print(" saved to EEPROM address: ");
+        Serial.println(calVal_eepromAdress);
+#else
+        Serial.println("EEPROM not supported on this platform");
+#endif
+        _resume = true;
+      }
+      else if (inByte == 'n') {
+        Serial.println("Value not saved to EEPROM");
+        _resume = true;
+      }
+    }
   }
-}
-
-void calibrate_load_sensor() {
-  int phase = 1;
-  float scale5 = 0;
-  float scale15 = 0;
-  float m5 = 0;
-  float m15 = 0;
-
-  Serial.println("Starting calibration..");
-
-  neopixel_flash(1);
-  load.tare(50);
-  Serial.println("Phase 1: No weight on the pedal");
-  
-  while (!DFU_button_pressed()) {  
-    nvram_settings.load_offset = load.get_offset();
-    Serial.printf("Tare value: %d | Press button if ready | Reset to cancel\n", nvram_settings.load_offset);
-    delay(500);
-  }
-  load.tare(nvram_settings.load_offset);
-
-  neopixel_flash(2);
-  Serial.println("Phase 2: 5 kg weight on the pedal");
-  
-  while (!DFU_button_pressed()) {  
-    // Get current load
-    scale5 = load.get_scale();
-    Serial.printf("Scale value (5 kg): %d | Press button if ready | Reset to cancel\n", scale5);
-    delay(500);
-  }
-
-  neopixel_flash(3);
-  Serial.println("Phase 3: 15 kg weight on the pedal");
-  
-  while (!DFU_button_pressed()) {  
-    // Get current load
-    scale15 = load.get_scale();
-    Serial.printf("Scale value (15 kg): %d | Press button if ready | Reset to cancel\n", scale15);
-    delay(500);
-  }
-
-  m5=5*9.8/scale5;
-  m15=15*9.8/scale15;
-  nvram_settings.load_multiplier = 1 / ((m5+m15)/2);
-
-  Serial.printf("Tare (load_offset) value = %f\n", nvram_settings.load_offset);
-  Serial.printf("Load multiplier for HX711 library = %f\n", nvram_settings.load_multiplier);
-
-//  nrfx_nvmc_page_erase(NVRAM_SETTINGS_PAGE_ADDR);
-//  nrfx_nvmc_bytes_write((unsigned char *)&nvram_settings, NVRAM_SETTINGS_PAGE_ADDR, sizeof(nvram_settings));
-
-  Serial.println("Calibration finished.");
-  delay(5000);
+  Serial.println("End change calibration value");
+  Serial.println("***");
 }

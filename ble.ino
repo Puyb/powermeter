@@ -25,30 +25,39 @@ BLEDfu bledfu;    // OTA DFU service
 BLEDis bledis;    // DIS (Device Information Service) helper class instance
 BLEBas blebas;    // BAS (Battery Service) helper class instance
 BLEUart bleuart;  // UART over BLE 
-//BLEPeriph bleperiph; // peripheral role's connection
-//BLEConnection blecon; // replacing several Bluefruit functions
+
+#define MAX_PRPH_CONNECTION   2
 
 void bleSetup() {
-  Bluefruit.begin();
-  Bluefruit.setName(DEV_NAME);
+
+  // off Blue LED for lowest power consumption
+  Bluefruit.autoConnLed(true);
+
+  Bluefruit.begin(MAX_PRPH_CONNECTION, 0);
+  Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
+
+//  Bluefruit.setName(DEV_NAME);
 
   // Set the connect/disconnect callback handlers
   Bluefruit.Periph.setConnectCallback(connectCallback);
   Bluefruit.Periph.setDisconnectCallback(disconnectCallback);
 
-  // off Blue LED for lowest power consumption
-  Bluefruit.autoConnLed(false);
-
+  // To be consistent OTA DFU should be added first if it exists
+  bledfu.begin();
+  
   // Configure and Start the Device Information Service
   bledis.setManufacturer("Adafruit Industries");
   bledis.setModel("Bluefruit Feather52");
   bledis.begin();
 
+  // Configure and Start BLE Uart Service
+  bleuart.begin();
+
   // Start the BLE Battery Service
   blebas.begin();
 
-  // Configure and Start BLE Uart Service
-  bleuart.begin();
+  // Configure and Start BLE DFU OTA service
+  bledfu.begin();
 
   // Setup the Heart Rate Monitor service using
   // BLEService and BLECharacteristic classes
@@ -56,18 +65,17 @@ void bleSetup() {
 
   // Setup the advertising packet(s)
   startAdv();
+  Serial.println("Bluetooth initialized. Please use Adafruit's Bluefruit LE app to connect in UART mode");
 }
 
 void startAdv(void) {
   // Advertising packet
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   // Set max power. Accepted values are: -40, -30, -20, -16, -12, -8, -4, 0, 4
-  Bluefruit.setTxPower(-8);
+//  Bluefruit.setTxPower(-8);
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addService(pwrService);
-#ifdef BLE_LOGGING
   Bluefruit.Advertising.addService(bleuart);
-#endif
   Bluefruit.Advertising.addName();
 
   /* Start Advertising
@@ -218,15 +226,6 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
 
   //Log.notice("BLE published flags: %X %X pwr: %X %X cranks: %X %X last time: %X %X\n", 
   //           pwrdata[0], pwrdata[1], pwrdata[2], pwrdata[3], pwrdata[4], pwrdata[5], pwrdata[6], pwrdata[7]);
-
-  if (pwrMeasChar.notify(pwrdata, sizeof(pwrdata))) {
-#ifdef DEBUG
-    Serial.print("Power measurement updated to: ");
-    Serial.println(instantPwr);
-  } else {
-    Serial.println("ERROR: Power notify not set in the CCCD or not connected!");
-#endif
-  }
 }
 
 void blePublishBatt(uint8_t battPercent) {
@@ -243,13 +242,19 @@ void connectCallback(uint16_t connHandle) {
   
   connection->getPeerName(centralName, sizeof(centralName));
 
-  // Light up our 'connected' LED
-  digitalWrite(LED_PIN, HIGH);
-
-#ifdef DEBUG
   Serial.print("Connected to ");
   Serial.println(centralName);
-#endif
+
+  connection_count++;
+  Serial.print("Connection count: ");
+  Serial.println(connection_count);
+  
+  // Keep advertising if not reaching max
+  if (connection_count < MAX_PRPH_CONNECTION)
+  {
+    Serial.println("Keep advertising");
+    Bluefruit.Advertising.start(0);
+  }
 }
 
 /**
@@ -262,31 +267,10 @@ void disconnectCallback(uint16_t connHandle, uint8_t reason) {
   (void) connHandle;
   (void) reason;
 
-  digitalWrite(LED_PIN, LOW);
-
-#ifdef DEBUG
-      Serial.println("Disconnected");
-      Serial.println("Advertising!");
-#endif
+  connection_count--;
+  
+  Serial.println("Disconnected");
 }
-
-/*
-void cccdCallback(BLECharacteristic& chr, uint16_t cccdValue) {
-#ifdef DEBUG
-  // Display the raw request packet
-    Serial.printf("CCCD Updated: %d\n", cccdValue);
-
-  // Check the characteristic this CCCD update is associated with in case
-  // this handler is used for multiple CCCD records.
-  if (chr.uuid == pwrMeasChar.uuid) {
-    if (chr.notifyEnabled()) {
-      Serial.println("Pwr Measurement 'Notify' enabled");
-    } else {
-      Serial.println("Pwr Measurement 'Notify' disabled");
-    }
-  }
-#endif
-} */
 
 /*
  * Given a 16-bit uint16_t, convert it to 2 8-bit ints, and set

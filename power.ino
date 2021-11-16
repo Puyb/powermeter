@@ -4,18 +4,17 @@
 
 */
 
+#include "Adafruit_MPU6050.h"
+#include "Adafruit_Sensor.h"
+#include "nrfx_nvmc.h"
+#include "board.h"
+#if defined(ESP8266)|| defined(ESP32) || defined(AVR)
+#include <EEPROM.h>
+#endif
 #include <Wire.h>
 #include <bluefruit.h>
-//#include <ArduinoBLE.h>
-//#include <SD.h>
 #include <SPI.h>
-#include <Adafruit_NeoPixel.h>
-
-#include "MPU6050.h"
-#include "HX711.h"
-#include "nrf_nvmc.h"
-#include "board.h"
-
+#include "HX711_ADC.h"
 
 // Virtufit Etappe I
 //#define DEBUG
@@ -65,10 +64,14 @@
 volatile long timeFirstSleepCheck=0;
 volatile long Sleepy=0;
 
+// Bluetooth
+uint8_t connection_count = 0;
+
 // NVRAM settings_struct (used by calibration)
-#define NVRAM_SETTINGS_PAGE_ADDR 0x00020000
+int nvram_page_address=0x00024000;
+
 typedef struct settings_struct {
-  unsigned char calibrated; // NVRAM.cpp writes 0xff here if NVRAM is empty => not calibated yet
+  unsigned char calibrated; 
 
   int gyro_offset = 0;
   long load_offset = 0;
@@ -76,47 +79,55 @@ typedef struct settings_struct {
 } nvram_settings_struct;
 nvram_settings_struct nvram_settings;
 
-MPU6050 gyro;
-HX711 load;
+//HX711 pins:
+#define HX711_dout 4 //mcu > HX711 dout pin (from example)
+#define HX711_sck 5 //mcu > HX711 sck pin (from example)
+static boolean newForceDataReady = 0;
+
+//HX711 constructor:
+HX711_ADC LoadCell(HX711_dout, HX711_sck);
+
+//HX711 EEPROM calibration settings saving/loading
+const int calVal_eepromAdress = 0;
+unsigned long t = 0;
+
+//MPU6050 constructor:
+Adafruit_MPU6050 mpu;
 
 
 void setup() {
   Wire.begin();
+
   Serial.begin(115200);
+  int cnt=0;
+  while ( !Serial && (cnt++ < 300)) delay(10);   // for nrf52840 with native usb
 
   timeFirstSleepCheck=0;
   Sleepy = 0;
 
-  pinMode(BOARD_PIN_DFU, INPUT); // DFU button
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(LED_CONN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
 
   // Setup, calibrate our other components
   gyroSetup();
   loadSetup();
   bleSetup();
-//  calibrateSetup();
+
+  Serial.println("Setup completed");
+  Serial.println("");
+  Serial.println("Send 'c' from serial monitor to calibrate the load sensor.");
+  delay(200);
 }
 
 void loop() {
-  // These aren't actually the range of a double, but
-  // they should easily bookend force readings.
-  static const float MIN_DOUBLE = -100000.f;
-  static const float MAX_DOUBLE = 100000.f;
-
   // Vars for polling footspeed
-  static float dps = 0.f;
   static float avgDps = 0.f;
   // Cadence is calculated by increasing total revolutions.
   // TODO it's possible this rolls over, about 12 hours at 90RPM for 16 bit unsigned.
   static uint16_t totalCrankRevs = 0;
   // Vars for force
-  static double force = 0.f;
-  static double avgForce = 0.f;
-  // Track the max and min force per update, and exclude them.
-  static double maxForce = MIN_DOUBLE;
-  static double minForce = MAX_DOUBLE;
+  static float avgForce = 0.f;
+
   // We only publish every once-in-a-while.
   static long lastUpdate = millis();
   // Other things (like battery) might be on a longer update schedule for power.
@@ -124,24 +135,16 @@ void loop() {
   // To find the average values to use, count the num of samples
   // between updates.
   static int16_t numPolls = 0;
+  bool pedaling = false;
 
   // During every loop, we just want to get samples to calculate
   // one power/cadence update every interval we update the central.
-
+  
   // Degrees per second
-  dps = getNormalAvgVelocity(dps);
-  avgDps += dps;
+  avgDps = getNormalAvgVelocity();
 
   // Now get force from the load cell.
-  force = getAvgForce(force);
-  // We wanna throw out the max and min.
-  if (force > maxForce) {
-    maxForce = force;
-  }
-  if (force < minForce) {
-    minForce = force;
-  }
-  avgForce += force;
+  avgForce = getAvgForce();
 
   numPolls += 1;
 
@@ -151,48 +154,22 @@ void loop() {
 
 #ifdef DEBUG
   // Just print these values to the serial, something easy to read.
-  Serial.print(F("Force: ")); Serial.println(force);
+  Serial.print(F("Force: ")); Serial.println(avgForce);
   Serial.print(F("DPS:   ")); Serial.println(dps);
 #endif  // DEBUG
 
-  if (Bluefruit.connected()) {
+//  if (Bluefruit.connected()) {
+  if (connection_count > 0) {
     // We have a central connected
     long timeNow = millis();
     long timeSinceLastUpdate = timeNow - lastUpdate;
-    // Must ensure there are more than 2 polls, because we're tossing the high and low.
-    // Check to see if the updateTime fun determines the cranks are cranking (in which)
-    // case it'll aim to update once per revolution. If that's the case,
-    // increment crank revs.
-    bool pedaling = false;
-    if (timeSinceLastUpdate > updateTime(dps, &pedaling) && numPolls > 2) {
-      // Find the actual averages over the polling period.
-      avgDps = avgDps / numPolls;
-      // Subtract 2 from the numPolls for force because we're removing the high and
-      // low here.
-      avgForce = avgForce - minForce - maxForce;
-      avgForce = avgForce / (numPolls - 2);
-
+   
+    if (timeSinceLastUpdate > updateTime(avgDps, &pedaling) && numPolls > 2) {
       // Convert dps to mps
       float mps = getCircularVelocity(avgDps);
 
       // That's all the ingredients, now we can find the power.
       int16_t power = calcPower(mps, avgForce);
-
-#ifndef DISABLE_LOGGING
-      File logfile = SD.open("data.log", FILE_WRITE);
-      char msg[1024];
-      sprintf(msg, "%ld - Pedal? %s. Force: %.1f. Max: %.1f, Min: %.1f. DPS: %.1f, MPS: %.1f. Power: %d",
-              timeNow, pedaling ? "true" : "false", avgForce, maxForce, minForce, avgDps, mps, power);
-      logfile.println(msg);
-      logfile.close();
-      //Log.notice("%l - Pedaling? %t. Force: %F. Max: %F, Min: %F. DPS: %F, MPS: %F. Power: %d\n",
-      //           timeNow, pedaling, avgForce, maxForce, minForce, avgDps, mps, power);
-#endif // DISABLE_LOGGING
-
-      // Also bake in a rolling average for all records reported to
-      // the head unit. Will hopefully smooth out the power meter
-      // spiking about.
-      //power = rollAvgPower(power, 0.7f);
 
 #ifdef DEBUG
       // Just print these values to the serial, something easy to read.
@@ -220,8 +197,6 @@ void loop() {
       lastUpdate = timeNow;
       // Let the averages from this polling period just carry over.
       numPolls = 1;
-      maxForce = MIN_DOUBLE;
-      minForce = MAX_DOUBLE;
 
       // And check the battery, don't need to do it nearly this often though.
       // 1000 ms / sec * 60 sec / min * 5 = 5 minutes
@@ -233,35 +208,22 @@ void loop() {
     }
   }
 
+  // receive command from serial terminal
+  if (Serial.available() > 0) {
+    char inByte = Serial.read();
+    if (inByte == 'c') calibrateLoadCell(); //calibrate
+  }
 
-if(DFU_button_pressed()) {
-  calibrateSetup();
-//  calibrate_load_sensor();
-}
+  // Pass-through USB/Bluethooth (BLE) data
+  bleuart_data_transfer();
 
-// Pass-through USB/Bluethooth (BLE) data
-bleuart_data_transfer();
+  // Should we go to sleep?
+  gyroCheckSleepy(pedaling);
 
-// Should we go to sleep?
-gyroCheckSleepy();
+  delay(LOOP_DELAY);
 
-delay(LOOP_DELAY);
-
-  // Request CPU to enter low-power mode until an event/interrupt occurs
+// Request CPU to enter low-power mode until an event/interrupt occurs
 //  waitForEvent();
-}
-
-/**
-   Rolling average for power reported to head unit.
-   Pass the current reading and the float to weight it.
-   Weight is the weight given to the current, previous will
-   have 1.0-weight weight.
-*/
-int16_t rollAvgPower(int16_t current, float weight) {
-  static int16_t prevAvg = 0;  // Initially none
-  int16_t rollingAvg = (weight * current) + ((1.f - weight) * prevAvg);
-  prevAvg = rollingAvg;
-  return rollingAvg;
 }
 
 /**

@@ -18,124 +18,131 @@ void gyroSetup() {
   // "gyro" is defined in main, Arduino implicitly smashes these files together
   // to compile, so it's in scope.
   timeFirstSleepCheck=0;
-  
-  gyro.initialize();
-  // Set to +/- 1000dps.
-  gyro.setFullScaleGyroRange(MPU6050_GYRO_FS_1000);
 
-#ifdef DEBUG
-  // verify connection
-  Serial.println(F("Testing device connections..."));
-  Serial.println(gyro.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
-#endif // DEBUG
+  // Try to initialize! (address = 0x68)
+  if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+    while (1) {
+      delay(10);
+    }
+  }
+  Serial.println("MPU6050 Found");
 
-// TODO make a calibration mode. For now, test manually.
-// 5 tests sitting at the kitchen table, offsets were   -39 -39 -39 -38 -38
-#ifdef CALIBRATE
-  // Calibrate the gyro
-  gyro.setZGyroOffset(0);
-  float sumZ = 0;
-  int16_t maxSample = -32768;
-  int16_t minSample = 32767;
-  // Read n-samples
-  for (uint8_t i = 0; i < CALIBRATION_SAMPLES; ++i) {
-    delay(5);
-    int16_t reading = gyro.getRotationZ();
-    if (reading > maxSample) maxSample = reading;
-    if (reading < minSample) minSample = reading;
-    sumZ += reading;
+  // disable 'wakeup' interupt
+  mpu.setMotionInterrupt(false);
+
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  Serial.print("Accelerometer range set to: ");
+  switch (mpu.getAccelerometerRange()) {
+  case MPU6050_RANGE_2_G:
+    Serial.println("+-2G");
+    break;
+  case MPU6050_RANGE_4_G:
+    Serial.println("+-4G");
+    break;
+  case MPU6050_RANGE_8_G:
+    Serial.println("+-8G");
+    break;
+  case MPU6050_RANGE_16_G:
+    Serial.println("+-16G");
+    break;
+  }
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  Serial.print("Gyro range set to: ");
+  switch (mpu.getGyroRange()) {
+  case MPU6050_RANGE_250_DEG:
+    Serial.println("+- 250 deg/s");
+    break;
+  case MPU6050_RANGE_500_DEG:
+    Serial.println("+- 500 deg/s");
+    break;
+  case MPU6050_RANGE_1000_DEG:
+    Serial.println("+- 1000 deg/s");
+    break;
+  case MPU6050_RANGE_2000_DEG:
+    Serial.println("+- 2000 deg/s");
+    break;
   }
 
-  // Throw out the two outliers
-  sumZ -= minSample;
-  sumZ -= maxSample;
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  Serial.print("Filter bandwidth set to: ");
+  switch (mpu.getFilterBandwidth()) {
+  case MPU6050_BAND_260_HZ:
+    Serial.println("260 Hz");
+    break;
+  case MPU6050_BAND_184_HZ:
+    Serial.println("184 Hz");
+    break;
+  case MPU6050_BAND_94_HZ:
+    Serial.println("94 Hz");
+    break;
+  case MPU6050_BAND_44_HZ:
+    Serial.println("44 Hz");
+    break;
+  case MPU6050_BAND_21_HZ:
+    Serial.println("21 Hz");
+    break;
+  case MPU6050_BAND_10_HZ:
+    Serial.println("10 Hz");
+    break;
+  case MPU6050_BAND_5_HZ:
+    Serial.println("5 Hz");
+    break;
+  }
 
-  // Two fewer than the calibration samples because we took out two outliers.
-  float deltaZ = sumZ / (CALIBRATION_SAMPLES - 2);
-  deltaZ = -1 * deltaZ;
-#ifdef DEBUG
-  Serial.printf("Discounting max (%d) and min (%d) samples.\n", maxSample, minSample);
-  Serial.printf("Gyro calculated offset: %f\n", deltaZ); 
-#endif // DEBUG
-#endif // CALIBRATE
-
-  // In lieu of being able to store results from a calibration mode...
-#ifndef CALIBRATE
-  float deltaZ = GYRO_OFFSET;
-#endif // CALIBRATE
-
-  // Set that calibration
-  gyro.setZGyroOffset(deltaZ);
-
-  // Set zero motion detection
-  gyro.setIntZeroMotionEnabled(true);
-  gyro.setZeroMotionDetectionThreshold(4);
-  // 1 LSB = 64ms. So 30s = 
-  gyro.setZeroMotionDetectionDuration(80);
-  gyro.setInterruptLatchClear(true);
+  Serial.println("");
+  delay(100);
 
   // Setup sleep
   Sleepy = 1;
-  timeFirstSleepCheck=millis();
+  timeFirstSleepCheck=0;
 
-  pinMode(GYRO_INT_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(GYRO_INT_PIN), motionDetectChange, RISING);
+//  attachInterrupt(digitalPinToInterrupt(GYRO_INT_PIN), motionDetectChange, RISING); 
 }
 
-void gyroCheckSleepy() {
-  if ((timeFirstSleepCheck > 0) && ((millis() - timeFirstSleepCheck) > MILLIS_TO_SLEEP)) 
-  {
-    detachInterrupt(digitalPinToInterrupt(GYRO_INT_PIN));
-    Bluefruit.autoConnLed(false);
-    digitalWrite(LED_CONN, LOW);
-    digitalWrite(LED_BUILTIN, LOW);
+void gyroCheckSleepy(bool pedaling) {
+  if (!pedaling) {
+    if ((timeFirstSleepCheck > 0) && ((millis() - timeFirstSleepCheck) > MILLIS_TO_SLEEP)) 
+    {
+//      detachInterrupt(digitalPinToInterrupt(GYRO_INT_PIN));
+      Bluefruit.autoConnLed(false);
+      digitalWrite(LED_CONN, LOW);
+      digitalWrite(LED_BUILTIN, LOW);
 
-    Serial.printf("Going to low-power mode..\n");
-    delay(1000);
+      Serial.printf("Going to low-power mode..\n");
+      delay(1000);
 
+      // Set zero motion detection
+      mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
+      mpu.setMotionDetectionThreshold(1);
+      mpu.setMotionDetectionDuration(20);
+      mpu.setInterruptPinLatch(false);  
+      mpu.setInterruptPinPolarity(false); // active high
+      mpu.setMotionInterrupt(true);
 
-/*  Additional gyro wake options (maybe some day to decrease sensitivity)
-
-    gyro.setInterruptMode(1); // (0=active-high, 1=active-low)
-    gyro.setInterruptDrive(0); // (0=push-pull, 1=open-drain)
-    gyro.setInterruptLatch(0); // (0=50us-pulse, 1=latch-until-int-cleared)
-    gyro.setInterruptLatchClear(1); // (0=status-read-only, 1=any-register-read)
-    gyro.setIntEnabled(0);
-    gyro.setIntMotionEnabled(true);
-    gyro.setDHPFMode(1); // filtermode: 1 (5Hz)
-    gyro.setMotionDetectionThreshold(1);
-    gyro.setMotionDetectionDuration(40);
- */
-    nrf_gpio_cfg_input(2,NRF_GPIO_PIN_NOPULL); // Configure button as input (redundant?)
-    nrf_gpio_cfg_sense_input(2, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
-    sd_power_system_off();
-  }
-}
-
-void motionDetectChange() {
-  uint8_t motion = gyro.getMotionStatus();
-
-  if (motion) {
-    // motion to zero-motion detected
-    if (!Sleepy) {
-      Sleepy = 1;
-      timeFirstSleepCheck=millis();
-
-#ifdef DEBUG
-      Serial.println("No motion detected. Low-power mode will be activated after timeout.");
-#endif // DEBUG
-
+      pinMode(GYRO_INT_PIN, INPUT_PULLUP);
+      nrf_gpio_cfg_input(2,NRF_GPIO_PIN_NOPULL); 
+      nrf_gpio_cfg_sense_input(2, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
+      sd_power_system_off();
     }
-  } else {
-    // zero-motion to motion detected
-
-#ifdef DEBUG
-    Serial.println("Wakey wakey let's get crankey.");
-#endif // DEBUG
-
-    // Reset timeout
-    timeFirstSleepCheck=0;
-    Sleepy = 0;
+    else
+    {
+      // Not pedaling => start sleep timer
+      if(timeFirstSleepCheck == 0)
+      {
+        timeFirstSleepCheck = millis();
+        Serial.printf("No activity. Going for a nap in %d minutes\n",MILLIS_TO_SLEEP/(1000*60));
+      }
+    }
+  }
+  else
+  {
+    // Pedaling => reset sleep timer
+    if(timeFirstSleepCheck > 0)
+    {
+      timeFirstSleepCheck=0;
+      Serial.printf("Activity detected. Sleep timer reset\n");
+    }
   }
 }
 
@@ -149,32 +156,22 @@ void motionDetectChange() {
  *
  * Returns a value for foot speed, in degrees/second.
  */
-float getNormalAvgVelocity(const float & lastAvg) {
-  const static double WEIGHT = 0.90;
-  // At +/- 250 degrees/s, the LSB/deg/s is 131. Per the mpu6050 spec.
-  /* FS_SEL | Full Scale Range   | LSB Sensitivity
-   * -------+--------------------+----------------
-   * 0      | +/- 250 degrees/s  | 131 LSB/deg/s
-   * 1      | +/- 500 degrees/s  | 65.5 LSB/deg/s
-   * 2      | +/- 1000 degrees/s | 32.8 LSB/deg/s
-   * 3      | +/- 2000 degrees/s | 16.4 LSB/deg/s
-  */
-  const static float SENSITIVITY = 32.8;
+float getNormalAvgVelocity() {
+  /* Get new sensor events with the readings */
+  sensors_event_t a, g, temp;
 
-  // Request new data from the MPU. The orientation obviously dictates
-  // which x/y/z value we're interested in, but right now Z.
-  // Use the absolute value. Cause who knows if the chip is just backwards.
-  float rotz = abs(gyro.getRotationZ() / SENSITIVITY);
+  mpu.getEvent(&a, &g, &temp);
+
+//  Serial.printf("%d %d %d\n", a.acceleration.x, a.acceleration.y, a.acceleration.z);
+
+  float rotz = abs(g.gyro.z);
   if (rotz < 90) {
     // Magic number here, but less than 90 dps is less than 1 crank rotation 
     // in 4 seconds (15 RPM), just assume it's noise from the road bumps.
     rotz = 0.f;
   }
-  // Return a rolling average, including the last reading.
-  // e.g. if weight is 0.90, it's 10% what it used to be, 90% this new reading.
-  float newavg = (rotz * WEIGHT) + (lastAvg * (1 - WEIGHT));
 
-  return newavg;
+  return rotz;
 }
 
 /**
@@ -220,8 +217,9 @@ int16_t getCadence(float dps) {
  *  for gravity.
  */
 int16_t getAngle() {
-  // Sensitivity for 2g is 48
-  static const int16_t SENS = 48;
+  /* Get new sensor events with the readings */
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
 
   // TODO not certain how to do this yet. If we calibrate on the fly to
   // get known values, we have to worry about the orientation of the cranks
@@ -234,7 +232,5 @@ int16_t getAngle() {
   // almost continuously figure out what they are?
 
   // For now, just return the raw X acceleration.
-  return gyro.getAccelerationX() / SENS;
+  return a.acceleration.x;
 }
-
-
