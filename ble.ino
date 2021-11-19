@@ -168,6 +168,32 @@ void bleuart_data_transfer() {
   }
 }
 
+// Get user input from bluetooth or serial
+void GetUserInput(char* buf) {
+  buf[0] = 0;
+
+  // Get serial input
+  while (Serial.available())
+  {
+    // Delay to wait for enough input, since we have a limited transmission buffer
+    delay(20);
+
+    Serial.readBytes(buf, sizeof(buf));
+  }
+
+  // Get bluetooth input
+  int pos=0;
+  while (bleuart.available()) {
+    buf[pos++] = (char)bleuart.read();
+  }
+
+  if (pos > 1) buf[pos-1] = '\0';
+
+//  if (buf[0] != '\0') {
+//    Serial.printf("Buffer: (%s)(0x%x)(0x%x)\n",buf,buf[0],buf[1]); Serial.println("");
+//  }
+}
+
 /*
  * Publish the instantaneous power measurement.
  */
@@ -223,6 +249,10 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
   // All fields are 16-bit values, split into two 8-bit values.
   uint8_t pwrdata[8] = { flags[0], flags[1], pwr[0], pwr[1], cranks[0], cranks[1], lastTime[0], lastTime[1] };
   //uint8_t pwrdata[4] = { flags[0], flags[1], pwr[0], pwr[1] };
+
+  if (!pwrMeasChar.notify(pwrdata, sizeof(pwrdata))) {
+    Serial.print("ERROR: Power notify not set in the CCCD or not connected!\n");
+  }
 
   //Log.notice("BLE published flags: %X %X pwr: %X %X cranks: %X %X last time: %X %X\n", 
   //           pwrdata[0], pwrdata[1], pwrdata[2], pwrdata[3], pwrdata[4], pwrdata[5], pwrdata[6], pwrdata[7]);
@@ -283,4 +313,41 @@ void uint16ToLso(uint16_t val, uint8_t* out) {
   uint8_t mso = (val >> 8) & 0xff;
   out[0] = lso;
   out[1] = mso;
+}
+
+/*
+ * Publish logging to bluetooth
+ */
+void blePublishLog(char *msg, int numBytes) {
+  static const short MAX = 20;  // 19 chars plus the null terminator
+  int bytesToDo = numBytes;
+
+  while (bytesToDo > 0) {
+
+    if (bytesToDo > MAX) {
+      bleuart.write(msg, MAX);
+      bytesToDo -= MAX;
+      msg = strcpy(msg, &msg[MAX]);
+    } else {
+      bleuart.write(msg, bytesToDo);
+      bytesToDo = 0;
+    }
+    delay(20);
+  }
+}
+
+void printfLog(const char* fmt, ...) {
+  
+  static const short MAX = 20;  // 19 chars plus the null terminator
+  static char msg[256];
+
+  va_list args;
+  va_start(args, fmt);
+  int numBytes = vsnprintf(msg, 255, fmt, args);
+  va_end(args);
+
+  if ((numBytes > 0) && (numBytes < 255)) {
+    Serial.print(msg); 
+    if (connection_count > 0) blePublishLog(msg, numBytes);
+  } 
 }

@@ -109,10 +109,13 @@ void gyroCheckSleepy(bool pedaling) {
       digitalWrite(LED_CONN, LOW);
       digitalWrite(LED_BUILTIN, LOW);
 
-      Serial.printf("Going to low-power mode..\n");
+      printfLog("Going to low-power mode..\n");
       delay(1000);
 
-      // Set zero motion detection
+      // Power down loadcell
+      LoadCell.powerDown();
+
+      // Set zero motion detection at gyro MPU6050
       mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
       mpu.setMotionDetectionThreshold(1);
       mpu.setMotionDetectionDuration(20);
@@ -120,6 +123,7 @@ void gyroCheckSleepy(bool pedaling) {
       mpu.setInterruptPinPolarity(false); // active high
       mpu.setMotionInterrupt(true);
 
+      // Enable wake-up by motion interrupt
       pinMode(GYRO_INT_PIN, INPUT_PULLUP);
       nrf_gpio_cfg_input(2,NRF_GPIO_PIN_NOPULL); 
       nrf_gpio_cfg_sense_input(2, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
@@ -130,8 +134,9 @@ void gyroCheckSleepy(bool pedaling) {
       // Not pedaling => start sleep timer
       if(timeFirstSleepCheck == 0)
       {
+        int sleeptime=MILLIS_TO_SLEEP/(1000*60);
         timeFirstSleepCheck = millis();
-        Serial.printf("No activity. Going for a nap in %d minutes\n",MILLIS_TO_SLEEP/(1000*60));
+        printfLog("No activity. Going for a nap in %d minutes\n",sleeptime);
       }
     }
   }
@@ -141,7 +146,7 @@ void gyroCheckSleepy(bool pedaling) {
     if(timeFirstSleepCheck > 0)
     {
       timeFirstSleepCheck=0;
-      Serial.printf("Activity detected. Sleep timer reset\n");
+      printfLog("Activity detected. Sleep timer reset\n");
     }
   }
 }
@@ -162,7 +167,7 @@ float getNormalAvgVelocity() {
 
   mpu.getEvent(&a, &g, &temp);
 
-//  Serial.printf("%d %d %d\n", a.acceleration.x, a.acceleration.y, a.acceleration.z);
+//  printfLog("%d %d %d\n", a.acceleration.x, a.acceleration.y, a.acceleration.z);
 
   float rotz = abs(g.gyro.z);
   if (rotz < 90) {

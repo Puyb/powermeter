@@ -8,7 +8,7 @@ IMPLEMENTED:
 - UART over bluetooth to enable connection via the Adafruit Bluefruit LE connect App (iOS/Android)
 - Sleep + wakeup by gyro motion
 - Upgrade to latest Adafruit nRF52 version (supporting BLE multi)
-- Integrated calibration
+- Integrated calibration via Adafruit Bluefruit LE connect App (UART)
 
 TODO: 
 - It seemed my version only works when compiling for 'DEBUG'

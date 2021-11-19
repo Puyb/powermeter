@@ -113,9 +113,8 @@ void setup() {
   loadSetup();
   bleSetup();
 
-  Serial.println("Setup completed");
-  Serial.println("");
-  Serial.println("Send 'c' from serial monitor to calibrate the load sensor.");
+  Serial.printf("Setup completed.\n\n");
+  Serial.printf("Send 'c' from bluetooth or serial monitor to start calibration.\n\n");
   delay(200);
 }
 
@@ -149,14 +148,10 @@ void loop() {
   numPolls += 1;
 
 #ifdef BLE_LOGGING
-  blePublishLog("F%.1f|%.1f %d", force, dps, numPolls);
+  printfLog("Force: %.1f\n", force);
+  printfLog("dps: %.1f\n", dps);
+  printfLog("numPolls: %d\n", numPolls);
 #endif
-
-#ifdef DEBUG
-  // Just print these values to the serial, something easy to read.
-  Serial.print(F("Force: ")); Serial.println(avgForce);
-  Serial.print(F("DPS:   ")); Serial.println(dps);
-#endif  // DEBUG
 
 //  if (Bluefruit.connected()) {
   if (connection_count > 0) {
@@ -171,10 +166,8 @@ void loop() {
       // That's all the ingredients, now we can find the power.
       int16_t power = calcPower(mps, avgForce);
 
-#ifdef DEBUG
       // Just print these values to the serial, something easy to read.
-      Serial.print(F("Pwr: ")); Serial.println(power);
-#endif  // DEBUG
+//      printfLog("Power: %d\n",power);
 
       // The time since last update, as published, is actually at
       // a resolution of 1/1024 seconds, per the spec. BLE will convert, just send
@@ -184,15 +177,10 @@ void loop() {
       }
       blePublishPower(power, totalCrankRevs, timeNow);
 
-#ifdef BLE_LOGGING
-      // It's not even useful for sending cadence to the computer, ironically.
+/*
       int16_t cadence = getCadence(avgDps);
-      // Log chars over BLE, for some insight when not wired to a
-      // laptop. Need to keep total ASCII to 20 chars or less.
-      blePublishLog("B%.1f %.1f %d", avgForce, mps, power);
-      blePublishLog("%d: %d polls", millis() / 1000, numPolls);
-#endif
-
+      printfLog("B%.1f %.1f %d\n", avgForce, mps, power);
+*/
       // Reset the latest update to now.
       lastUpdate = timeNow;
       // Let the averages from this polling period just carry over.
@@ -208,14 +196,13 @@ void loop() {
     }
   }
 
-  // receive command from serial terminal
-  if (Serial.available() > 0) {
-    char inByte = Serial.read();
-    if (inByte == 'c') calibrateLoadCell(); //calibrate
-  }
 
+  char buf[64]={'\0'};
+  GetUserInput(buf);
+  if (buf[0] == 'c') calibrateLoadCell(); //calibrate
+  
   // Pass-through USB/Bluethooth (BLE) data
-  bleuart_data_transfer();
+  //bleuart_data_transfer();
 
   // Should we go to sleep?
   gyroCheckSleepy(pedaling);
