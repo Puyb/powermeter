@@ -251,7 +251,7 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
   //uint8_t pwrdata[4] = { flags[0], flags[1], pwr[0], pwr[1] };
 
   if (!pwrMeasChar.notify(pwrdata, sizeof(pwrdata))) {
-    Serial.print("ERROR: Power notify not set in the CCCD or not connected!\n");
+  //  Serial.print("ERROR: Power notify not set in the CCCD or not connected!\n");
   }
 
   //Log.notice("BLE published flags: %X %X pwr: %X %X cranks: %X %X last time: %X %X\n", 
@@ -272,13 +272,11 @@ void connectCallback(uint16_t connHandle) {
   
   connection->getPeerName(centralName, sizeof(centralName));
 
-  Serial.print("Connected to ");
-  Serial.println(centralName);
-
   connection_count++;
-  Serial.print("Connection count: ");
-  Serial.println(connection_count);
-  
+
+  Serial.printf("Connected to %s", centralName);
+  Serial.printf("Connection count: %d", connection_count);
+
   // Keep advertising if not reaching max
   if (connection_count < MAX_PRPH_CONNECTION)
   {

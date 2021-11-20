@@ -63,6 +63,8 @@
 // Interrupt related variables (must be volatile)
 volatile long timeFirstSleepCheck=0;
 volatile long Sleepy=0;
+volatile int last_connection_count=0;
+volatile long connectedStart=0;
 
 // Bluetooth
 uint8_t connection_count = 0;
@@ -159,6 +161,20 @@ void loop() {
     long timeNow = millis();
     long timeSinceLastUpdate = timeNow - lastUpdate;
    
+    if(connection_count != last_connection_count) {
+      if (connectedStart == 0) connectedStart = millis();
+      if((millis() - connectedStart) > (1000*6))
+      {
+        last_connection_count = connection_count;
+        connectedStart = 0;
+
+        printfLog("=================\n");
+        printfLog("Power Cycle Meter\n");
+        printfLog("=================\n\n");
+        printfLog("Send 'c' from bluetooth or serial monitor to start calibration.\n\n");
+      }
+    }
+
     if (timeSinceLastUpdate > updateTime(avgDps, &pedaling) && numPolls > 2) {
       // Convert dps to mps
       float mps = getCircularVelocity(avgDps);
@@ -194,6 +210,10 @@ void loop() {
         lastInfrequentUpdate = timeNow;
       }
     }
+  }
+  else
+  {
+    last_connection_count = 0;
   }
 
 
