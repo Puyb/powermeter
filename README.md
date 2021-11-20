@@ -11,8 +11,7 @@ IMPLEMENTED:
 - Integrated calibration via Adafruit Bluefruit LE connect App (UART)
 
 TODO: 
-- It seemed my version only works when compiling for 'DEBUG'
-- Persistant storage and retrieval of (calibration) settings via NVRAM
+- Persistant storage and retrieval of (calibration) settings via NVRAM for feather boards
 
 Thijs
 
