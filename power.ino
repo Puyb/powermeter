@@ -114,6 +114,7 @@ void setup() {
   gyroSetup();
   loadSetup();
   bleSetup();
+  getStoredCalibrationFactor();
 
   Serial.printf("Setup completed.\n\n");
   Serial.printf("Send 'c' from bluetooth or serial monitor to start calibration.\n\n");
