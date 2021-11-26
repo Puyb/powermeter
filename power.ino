@@ -16,6 +16,10 @@
 #include <SPI.h>
 #include "HX711_ADC.h"
 
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
+#include <Adafruit_TinyUSB.h> // for Serial
+
 // Virtufit Etappe I
 //#define DEBUG
 //#define BLE_LOGGING
@@ -30,7 +34,10 @@
 // If it isn't, just set to 1.
 #define HOOKEDUPLOADBACKWARDS 1
 #define DEV_NAME "CyclePowerMeter"
+#define NVMC_START_ADDRESS (0x0100000)
+#define NVMC_PAGE_SIZE (4096)
 
+#define CALIBRATIONS_FILENAME    "/calibrations.txt"
 
 // Universal defines
 
@@ -69,9 +76,6 @@ volatile long connectedStart=0;
 // Bluetooth
 uint8_t connection_count = 0;
 
-// NVRAM settings_struct (used by calibration)
-int nvram_page_address=0x00024000;
-
 typedef struct settings_struct {
   unsigned char calibrated; 
 
@@ -95,6 +99,10 @@ unsigned long t = 0;
 
 //MPU6050 constructor:
 Adafruit_MPU6050 mpu;
+
+//Internal filesystem
+using namespace Adafruit_LittleFS_Namespace;
+File file(InternalFS);
 
 
 void setup() {
