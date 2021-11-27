@@ -32,7 +32,7 @@
 // If the wires are hooked up backwards, the force is negated => -1
 // If it isn't, just set to 1.
 #define HOOKEDUPLOADBACKWARDS 1
-#define DEV_NAME "Cycle Power Meter"
+#define DEV_NAME "CyclePowerMeter"
 #define NVMC_START_ADDRESS (0x0100000)
 #define NVMC_PAGE_SIZE (4096)
 
@@ -73,8 +73,8 @@ volatile int last_connection_count=0;
 volatile long connectedStart=0;
 
 // Bluetooth
-int16_t test_power=0; // for testing
-uint16_t test_totalCrankRev=0; // for testing
+int16_t test_power=20; // for testing
+uint16_t test_totalCrankRev=1; // for testing
 uint8_t connection_count = 0;
 
 typedef struct settings_struct {

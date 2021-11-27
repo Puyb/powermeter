@@ -229,7 +229,6 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
    */
   // Flag cadence. Put most-significant octet first, it'll flip later.
   uint16_t flag = 0b0010000000000000;
-  //uint16_t flag = 0b0000000000000000;
 
   // All data in characteristics goes least-significant octet first.
   // Split them up into 8-bit ints. LSO ends up first in array.
@@ -240,6 +239,8 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
 
   // Cadnce last event time is time of last event, in 1/1024 second resolution
   uint16_t lastEventTime = uint16_t(millisLast / 1000.f * 1024.f) % 65536;
+//  Serial.printf("Timestamp: %d\n",lastEventTime);
+
   // Split the 16-bit ints into 8 bits, LSO is first in array.
   uint8_t cranks[2];
   uint16ToLso(crankRevs, cranks);
