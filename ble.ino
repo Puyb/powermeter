@@ -36,7 +36,7 @@ void bleSetup() {
   Bluefruit.begin(MAX_PRPH_CONNECTION, 0);
   Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
 
-//  Bluefruit.setName(DEV_NAME);
+  Bluefruit.setName(DEV_NAME);
 
   // Set the connect/disconnect callback handlers
   Bluefruit.Periph.setConnectCallback(connectCallback);
@@ -72,7 +72,7 @@ void startAdv(void) {
   // Advertising packet
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   // Set max power. Accepted values are: -40, -30, -20, -16, -12, -8, -4, 0, 4
-//  Bluefruit.setTxPower(-8);
+  Bluefruit.setTxPower(-8);
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addService(pwrService);
   Bluefruit.Advertising.addService(bleuart);
@@ -117,7 +117,7 @@ void setupPwr(void) {
   // 4 total bytes, 2 16-bit values
   pwrMeasChar.setFixedLen(4);
   // Optionally capture Client Characteristic Config Descriptor updates
-  //pwrMeasChar.setCccdWriteCallback(cccdCallback);
+  pwrMeasChar.setCccdWriteCallback(cccdCallback);
   pwrMeasChar.begin();
 
   /*
@@ -173,7 +173,7 @@ void GetUserInput(char* buf) {
   buf[0] = 0;
 
   // Get serial input
-  while (Serial.available())
+  if (Serial.available())
   {
     // Delay to wait for enough input, since we have a limited transmission buffer
     delay(20);
@@ -251,7 +251,7 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
   //uint8_t pwrdata[4] = { flags[0], flags[1], pwr[0], pwr[1] };
 
   if (!pwrMeasChar.notify(pwrdata, sizeof(pwrdata))) {
-  //  Serial.print("ERROR: Power notify not set in the CCCD or not connected!\n");
+//    printfLog("ERROR: Power notify not set in the CCCD or not connected!\n");
   }
 
   //Log.notice("BLE published flags: %X %X pwr: %X %X cranks: %X %X last time: %X %X\n", 
@@ -348,4 +348,19 @@ void printfLog(const char* fmt, ...) {
     Serial.print(msg); 
     if (connection_count > 0) blePublishLog(msg, numBytes);
   } 
+}
+
+void cccdCallback(uint16_t conn_hdl, BLECharacteristic* chr, uint16_t cccdValue) {
+  // Display the raw request packet
+    Serial.printf("CCCD Updated: %d\n", cccdValue);
+
+  // Check the characteristic this CCCD update is associated with in case
+  // this handler is used for multiple CCCD records.
+  if (chr->uuid == pwrMeasChar.uuid) {
+    if (chr->notifyEnabled()) {
+      Serial.println("Pwr Measurement 'Notify' enabled");
+    } else {
+      Serial.println("Pwr Measurement 'Notify' disabled");
+    }
+  }
 }

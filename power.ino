@@ -8,9 +8,6 @@
 #include "Adafruit_Sensor.h"
 #include "nrfx_nvmc.h"
 #include "board.h"
-#if defined(ESP8266)|| defined(ESP32) || defined(AVR)
-#include <EEPROM.h>
-#endif
 #include <Wire.h>
 #include <bluefruit.h>
 #include <SPI.h>
@@ -19,6 +16,8 @@
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
 #include <Adafruit_TinyUSB.h> // for Serial
+
+#include <BLECharacteristic.h>
 
 // Virtufit Etappe I
 //#define DEBUG
@@ -33,7 +32,7 @@
 // If the wires are hooked up backwards, the force is negated => -1
 // If it isn't, just set to 1.
 #define HOOKEDUPLOADBACKWARDS 1
-#define DEV_NAME "CyclePowerMeter"
+#define DEV_NAME "Cycle Power Meter"
 #define NVMC_START_ADDRESS (0x0100000)
 #define NVMC_PAGE_SIZE (4096)
 
@@ -74,6 +73,8 @@ volatile int last_connection_count=0;
 volatile long connectedStart=0;
 
 // Bluetooth
+int16_t test_power=0; // for testing
+uint16_t test_totalCrankRev=0; // for testing
 uint8_t connection_count = 0;
 
 typedef struct settings_struct {
@@ -88,7 +89,6 @@ nvram_settings_struct nvram_settings;
 //HX711 pins:
 #define HX711_dout 4 //mcu > HX711 dout pin (from example)
 #define HX711_sck 5 //mcu > HX711 sck pin (from example)
-static boolean newForceDataReady = 0;
 
 //HX711 constructor:
 HX711_ADC LoadCell(HX711_dout, HX711_sck);
@@ -131,7 +131,8 @@ void setup() {
 
 void loop() {
   // Vars for polling footspeed
-  static float avgDps = 0.f;
+  static float avgRad = 0.f;
+  static float rad=0.f;
   // Cadence is calculated by increasing total revolutions.
   // TODO it's possible this rolls over, about 12 hours at 90RPM for 16 bit unsigned.
   static uint16_t totalCrankRevs = 0;
@@ -151,19 +152,16 @@ void loop() {
   // one power/cadence update every interval we update the central.
   
   // Degrees per second
-  avgDps = getNormalAvgVelocity();
+  rad = getNormalAvgVelocity();
+  avgRad += rad;
+
 
   // Now get force from the load cell.
   avgForce = getAvgForce();
 
   numPolls += 1;
 
-#ifdef BLE_LOGGING
-  printfLog("Force: %.1f\n", force);
-  printfLog("dps: %.1f\n", dps);
-  printfLog("numPolls: %d\n", numPolls);
-#endif
-
+  
 //  if (Bluefruit.connected()) {
   if (connection_count > 0) {
     // We have a central connected
@@ -184,11 +182,12 @@ void loop() {
       }
     }
 
-    if (timeSinceLastUpdate > updateTime(avgDps, &pedaling) && numPolls > 2) {
-      // Convert dps to mps
-      float mps = getCircularVelocity(avgDps);
+    if (timeSinceLastUpdate > updateTime(avgRad, &pedaling) && numPolls > 1) {
 
-      // That's all the ingredients, now we can find the power.
+      avgRad = avgRad / numPolls;
+      avgForce = avgForce / numPolls;
+
+      float mps = getCircularVelocity(avgRad);
       int16_t power = calcPower(mps, avgForce);
 
       // Just print these values to the serial, something easy to read.
@@ -200,12 +199,19 @@ void loop() {
       if (pedaling) {
         totalCrankRevs += 1;
       }
-      blePublishPower(power, totalCrankRevs, timeNow);
+      
+      if((test_power>0) || (test_totalCrankRev>0))
+      {
+        test_totalCrankRev +=1;
+        blePublishPower(test_power, test_totalCrankRev, timeNow);
+        printfLog("AvgF: %.1f  avgR: %.1f  N: %d\n", avgForce, avgRad, numPolls);
+        printfLog("F: %d  CR: %d\n", test_power, test_totalCrankRev);
+      }
+      else
+      {
+        blePublishPower(power, totalCrankRevs, timeNow);
+      }
 
-/*
-      int16_t cadence = getCadence(avgDps);
-      printfLog("B%.1f %.1f %d\n", avgForce, mps, power);
-*/
       // Reset the latest update to now.
       lastUpdate = timeNow;
       // Let the averages from this polling period just carry over.
@@ -229,6 +235,7 @@ void loop() {
   char buf[64]={'\0'};
   GetUserInput(buf);
   if (buf[0] == 'c') calibrateLoadCell(); //calibrate
+  if (buf[0] == 'b') testBT(); //test bluetooth
   
   // Pass-through USB/Bluethooth (BLE) data
   //bleuart_data_transfer();
@@ -248,9 +255,9 @@ void loop() {
 
    Return update interval, in milliseconds.
 */
-float updateTime(float dps, bool *pedaling) {
+float updateTime(float rad, bool *pedaling) {
   // So knowing the dps, how long for 360 degrees?
-  float del = min(MIN_UPDATE_FREQ, 1000.f * (360.f / dps));
+  float del = min(MIN_UPDATE_FREQ, 1000.f * ((2*PI) / rad));
   if (del < MIN_UPDATE_FREQ) {
     // Let the caller know we didn't just hit the max pause,
     // the cranks are spinning.

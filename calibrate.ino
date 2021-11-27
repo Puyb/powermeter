@@ -2,6 +2,38 @@
  * Load sensor calibration routines
  */
 
+void testBT() {
+  bool _resume = false;
+  char buf[64]={'\0'};
+    
+  printfLog("Enter power value:\n");
+
+  _resume = false;
+  while (_resume == false) {
+    GetUserInput(buf);
+    if (buf[0] != '\0') {
+      test_power = atoi(buf);
+      if (test_power != 0) {
+        printfLog("Power set to: %d\n\n",test_power);
+        _resume = true;
+      }
+    }
+  }
+
+  printfLog("Enter crank revs value:\n");
+
+  _resume = false;
+  while (_resume == false) {
+    GetUserInput(buf);
+    if (buf[0] != '\0') {
+      test_totalCrankRev = atoi(buf);
+      if (test_totalCrankRev != 0) {
+        printfLog("Crank revs set to: %d\n\n",test_totalCrankRev);
+        _resume = true;
+      }
+    }
+  }
+}
 
 void calibrateLoadCell() {
   char buf[64]={'\0'};
@@ -27,7 +59,7 @@ void calibrateLoadCell() {
   }
 
   printfLog("Now, place your known mass on the loadcell.\n");
-  printfLog("Then send the weight of this mass in kg (i.e. 100).\n\n");
+  printfLog("Then enter the weight of this mass in kg (i.e. 100):\n\n");
 
   float known_mass = 0;
   _resume = false;

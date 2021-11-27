@@ -170,8 +170,8 @@ float getNormalAvgVelocity() {
 //  printfLog("%d %d %d\n", a.acceleration.x, a.acceleration.y, a.acceleration.z);
 
   float rotz = abs(g.gyro.z);
-  if (rotz < 90) {
-    // Magic number here, but less than 90 dps is less than 1 crank rotation 
+  if (rotz < (2*PI/4)) {
+    // Magic number (90 degrees) here, but less than 90 dps is less than 1 crank rotation 
     // in 4 seconds (15 RPM), just assume it's noise from the road bumps.
     rotz = 0.f;
   }
@@ -188,54 +188,6 @@ float getNormalAvgVelocity() {
  *
  * Value returned is in meters/second
  */
-float getCircularVelocity(float dps) {
-  // 2 * PI * radians = 360 degrees  -- by definition
-  // dps degrees/second * (PI / 180) rad/degree = rad/second
-  // (rad/sec) / (rad/circumference) = (rad/sec) / 2 * PI = ratio of a circumference traveled, still per second
-  // 2 * PI * CRANK_RADIUS = circumference  -- by definition, that's a circle
-  // ratio of circumference traveled * circumference = meters/second
-
-  // It all comes out to:
-  // m/s = ((dps * (PI / 180)) / (2 * PI)) * (2 * PI * CRANK_RADIUS);
-  // And simplifies to:
-  return (dps * PI * CRANK_RADIUS) / 180;
-}
-
-/**
- *  Provide angular velocity, degrees/sec.
- *
- *  Returns a new cadence measurement.
- *
- *  Note this isn't necessary for power measurement, but it's a gimme addon
- *  given what we already have and useful for the athlete.
- *
- *  Returns an int16 of cadence, rotations/minute.
- */
-int16_t getCadence(float dps) {
-  // Cadence is the normalized angular velocity, times 60/360, which
-  // converts from deg/s to rotations/min. x * (60/360) = x / 6.
-  return dps / 6;
-}
-
-/**
- *  Determine current angle of the crank arm. Based on the acceleration
- *  for gravity.
- */
-int16_t getAngle() {
-  /* Get new sensor events with the readings */
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-
-  // TODO not certain how to do this yet. If we calibrate on the fly to
-  // get known values, we have to worry about the orientation of the cranks
-  // when that's done. We could calibrate as a 1-time thing but that's less
-  // preferable because.. what if it drifts? If we don't calibrate, that
-  // could still be ok, because what we really want is to know the "peaks",
-  // min and max. Those are when the cranks are perpendicular to the ground.
-  // And the mins are straight up and down. Downside there is that the max
-  // values will change with the acceleration of cadence, so we'd have to
-  // almost continuously figure out what they are?
-
-  // For now, just return the raw X acceleration.
-  return a.acceleration.x;
+float getCircularVelocity(float rad) {
+  return (CRANK_RADIUS * rad / 2);
 }

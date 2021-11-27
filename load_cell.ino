@@ -44,13 +44,8 @@ void loadSetup() {
 float getAvgForce() {
   static float currentData = 0;
 
-  // check for new data/start next conversion:
-  if (LoadCell.update()) newForceDataReady = true;
-
-  // get smoothed value from the dataset:
-  if (newForceDataReady) {
+  if (LoadCell.update()) {
       currentData = LoadCell.getData() * HOOKEDUPLOADBACKWARDS;
-      newForceDataReady = 0;
   }
 
   return (currentData);
