@@ -20,6 +20,8 @@ BLEService        pwrService  = BLEService(UUID16_SVC_CYCLING_POWER);
 BLECharacteristic pwrMeasChar = BLECharacteristic(UUID16_CHR_CYCLING_POWER_MEASUREMENT);
 BLECharacteristic pwrFeatChar = BLECharacteristic(UUID16_CHR_CYCLING_POWER_FEATURE);
 BLECharacteristic pwrLocChar  = BLECharacteristic(UUID16_CHR_SENSOR_LOCATION);
+BLECharacteristic pwrVector   = BLECharacteristic(UUID16_CHR_CYCLING_POWER_VECTOR);
+
 
 BLEDfu bledfu;    // OTA DFU service
 BLEDis bledis;    // DIS (Device Information Service) helper class instance
@@ -110,12 +112,12 @@ void setupPwr(void) {
 
   // Has to have notify enabled.
   // Power measurement. This is the characteristic that really matters. See:
-  // https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.characteristic.cycling_power_measurement.xml
+  // https://github.com/oesmith/gatt-xml/blob/master/org.bluetooth.characteristic.cycling_power_measurement.xml
   pwrMeasChar.setProperties(CHR_PROPS_NOTIFY);
   // First param is the read permission, second is write.
   pwrMeasChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
-  // 4 total bytes, 2 16-bit values
-  pwrMeasChar.setFixedLen(4);
+  // 8 total bytes, 4 16-bit values
+  pwrMeasChar.setFixedLen(8);
   // Optionally capture Client Characteristic Config Descriptor updates
   pwrMeasChar.setCccdWriteCallback(cccdCallback);
   pwrMeasChar.begin();
@@ -127,24 +129,38 @@ void setupPwr(void) {
 
   // Characteristic for power feature. Has to be readable, but not necessarily
   // notify. 32 bit value of what's supported, see
-  // https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.characteristic.cycling_power_feature.xml
+  // org.bluetooth.characteristic.cycling_power_feature.xml
+  // https://github.com/sputnikdev/bluetooth-gatt-parser/blob/master/src/main/resources/gatt/characteristic/org.bluetooth.characteristic.cycling_power_feature.xml
   pwrFeatChar.setProperties(CHR_PROPS_READ);
   pwrFeatChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
   // 1 32-bit value
-  pwrFeatChar.setFixedLen(4);
+  pwrFeatChar.setFixedLen(8);
   pwrFeatChar.begin();
   // No extras for now, write 0.
-  pwrFeatChar.write32(0);
+  pwrFeatChar.write32(0b01000);
 
   // Characteristic for sensor location. Has to be readable, but not necessarily
   // notify. See:
-  // https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.characteristic.sensor_location.xml
+  // https://github.com/oesmith/gatt-xml/blob/master/org.bluetooth.characteristic.sensor_location.xml
   pwrLocChar.setProperties(CHR_PROPS_READ);
   pwrLocChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
   pwrLocChar.setFixedLen(1);
   pwrLocChar.begin();
   // Set location to "left crank"
   pwrLocChar.write8(5);
+
+
+  //
+  // https://github.com/sputnikdev/bluetooth-gatt-parser/blob/master/src/main/resources/gatt/characteristic/org.bluetooth.characteristic.cycling_power_control_point.xml
+  // org.bluetooth.characteristic.cycling_power_control_point.xml
+  //
+
+
+  //
+  //
+  // https://github.com/sputnikdev/bluetooth-gatt-parser/blob/master/src/main/resources/gatt/characteristic/org.bluetooth.characteristic.cycling_power_vector.xml
+  // org.bluetooth.characteristic.cycling_power_vector.xml
+
 }
 
 void bleuart_data_transfer() {
@@ -218,6 +234,8 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
    *   b12 offset compenstation indicator
    *   b13 reserved
    *
+   *   https://github.com/sputnikdev/bluetooth-gatt-parser/blob/master/src/main/resources/gatt/characteristic/org.bluetooth.characteristic.cycling_power_measurement.xml
+   * 
    * Instananous Power:
    *   16 bits signed int
    *   
@@ -227,8 +245,8 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
    * Last Crank Event Time
    *   16 bits signed int
    */
-  // Flag cadence. Put most-significant octet first, it'll flip later.
-  uint16_t flag = 0b0010000000000000;
+  // Flag cadence.
+  uint16_t flag = 0b0000000000100000;
 
   // All data in characteristics goes least-significant octet first.
   // Split them up into 8-bit ints. LSO ends up first in array.
@@ -237,7 +255,7 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
   uint8_t pwr[2];
   uint16ToLso(instantPwr, pwr);
 
-  // Cadnce last event time is time of last event, in 1/1024 second resolution
+  // Cadence last event time is time of last event, in 1/1024 second resolution
   uint16_t lastEventTime = uint16_t(millisLast / 1000.f * 1024.f) % 65536;
 //  Serial.printf("Timestamp: %d\n",lastEventTime);
 
@@ -248,7 +266,10 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
   uint16ToLso(lastEventTime, lastTime);
 
   // All fields are 16-bit values, split into two 8-bit values.
-  uint8_t pwrdata[8] = { flags[0], flags[1], pwr[0], pwr[1], cranks[0], cranks[1], lastTime[0], lastTime[1] };
+  uint8_t pwrdata[8] = { flags[0], flags[1],  
+                          pwr[0], pwr[1], 
+                          cranks[0], cranks[1],
+                          lastTime[0], lastTime[1] };
   //uint8_t pwrdata[4] = { flags[0], flags[1], pwr[0], pwr[1] };
 
   if (!pwrMeasChar.notify(pwrdata, sizeof(pwrdata))) {
