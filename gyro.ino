@@ -159,7 +159,7 @@ void gyroCheckSleepy(bool pedaling) {
  * love this, becaues it means no value is every entirely discarded, but exponential decay
  * probably makes it effectively the same. Maybe something to revisit.
  *
- * Returns a value for foot speed, in degrees/second.
+ * Returns a value for foot speed, in rad/second.
  */
 float getNormalAvgVelocity() {
   /* Get new sensor events with the readings */

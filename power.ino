@@ -184,7 +184,7 @@ void loop() {
       }
     }
 
-    if (timeSinceLastUpdate > updateTime(avgRad, &pedaling) && numPolls > 1) {
+    if (timeSinceLastUpdate > updateTime(rad, &pedaling) && numPolls > 1) {
 
       avgRad = avgRad / numPolls;
       avgForce = avgForce / numPolls;
@@ -202,12 +202,12 @@ void loop() {
         totalCrankRevs += 1;
       }
       
-      if((test_power>0) || (test_totalCrankRev>0))
+      if((test_power>0) || (test_totalCrankRev_inc>0))
       {
         test_totalCrankRev += test_totalCrankRev_inc;
         blePublishPower(test_power, test_totalCrankRev, timeNow);
-        printfLog("AvgF: %.1f  avgR: %.1f  N: %d\n", avgForce, avgRad, numPolls);
-        printfLog("F: %d  CR: %d\n", test_power, test_totalCrankRev);
+        printfLog("Force=%.1f  Cad=%.1f\n", avgForce, avgRad);
+        printfLog("TEST: Force=%d  Cad=%d\n", test_power, test_totalCrankRev);
       }
       else
       {
