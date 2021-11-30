@@ -117,7 +117,7 @@ void setupPwr(void) {
   // First param is the read permission, second is write.
   pwrMeasChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
   // 8 total bytes, 4 16-bit values
-  pwrMeasChar.setFixedLen(8);
+  pwrMeasChar.setFixedLen(PWR_MEAS_CHAR_LEN);
   // Optionally capture Client Characteristic Config Descriptor updates
   pwrMeasChar.setCccdWriteCallback(cccdCallback);
   pwrMeasChar.begin();
@@ -266,10 +266,10 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
   uint16ToLso(lastEventTime, lastTime);
 
   // All fields are 16-bit values, split into two 8-bit values.
-  uint8_t pwrdata[8] = { flags[0], flags[1],  
-                          pwr[0], pwr[1], 
-                          cranks[0], cranks[1],
-                          lastTime[0], lastTime[1] };
+  uint8_t pwrdata[PWR_MEAS_CHAR_LEN] = { flags[0], flags[1],  
+                                         pwr[0], pwr[1], 
+                                         cranks[0], cranks[1],
+                                         lastTime[0], lastTime[1] };
   //uint8_t pwrdata[4] = { flags[0], flags[1], pwr[0], pwr[1] };
 
   if (!pwrMeasChar.notify(pwrdata, sizeof(pwrdata))) {

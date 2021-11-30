@@ -33,8 +33,7 @@
 // If it isn't, just set to 1.
 #define HOOKEDUPLOADBACKWARDS 1
 #define DEV_NAME "Cycle Power Meter"
-#define NVMC_START_ADDRESS (0x0100000)
-#define NVMC_PAGE_SIZE (4096)
+#define PWR_MEAS_CHAR_LEN 8
 
 #define CALIBRATIONS_FILENAME    "/calibrations.txt"
 
