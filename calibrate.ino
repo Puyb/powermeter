@@ -6,7 +6,7 @@ void testBT() {
   bool _resume = false;
   char buf[64]={'\0'};
     
-  printfLog("Enter power value:\n");
+  printfLog("Enter power value [0-400]:\n");
 
   _resume = false;
   while (_resume == false) {
@@ -20,15 +20,15 @@ void testBT() {
     }
   }
 
-  printfLog("Enter crank revs value:\n");
+  printfLog("Enter crank revs increase value [1-5]:\n");
 
   _resume = false;
   while (_resume == false) {
     GetUserInput(buf);
     if (buf[0] != '\0') {
-      test_totalCrankRev = atoi(buf);
-      if (test_totalCrankRev != 0) {
-        printfLog("Crank revs set to: %d\n\n",test_totalCrankRev);
+      test_totalCrankRev_inc = atoi(buf);
+      if (test_totalCrankRev_inc != 0) {
+        printfLog("Crank revs increase set to: %d\n\n",test_totalCrankRev_inc);
         _resume = true;
       }
     }

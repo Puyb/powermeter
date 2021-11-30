@@ -73,8 +73,9 @@ volatile int last_connection_count=0;
 volatile long connectedStart=0;
 
 // Bluetooth
-int16_t test_power=20; // for testing
+int16_t test_power=0; // for testing
 uint16_t test_totalCrankRev=0; // for testing
+uint16_t test_totalCrankRev_inc=0; // for testing
 uint8_t connection_count = 0;
 
 typedef struct settings_struct {
@@ -178,6 +179,7 @@ void loop() {
         printfLog("=================\n");
         printfLog("Power Cycle Meter\n");
         printfLog("=================\n\n");
+        printfLog("Send 'b' from bluetooth or serial monitor to start test.\n\n");
         printfLog("Send 'c' from bluetooth or serial monitor to start calibration.\n\n");
       }
     }
@@ -202,7 +204,7 @@ void loop() {
       
       if((test_power>0) || (test_totalCrankRev>0))
       {
-        test_totalCrankRev +=1;
+        test_totalCrankRev += test_totalCrankRev_inc;
         blePublishPower(test_power, test_totalCrankRev, timeNow);
         printfLog("AvgF: %.1f  avgR: %.1f  N: %d\n", avgForce, avgRad, numPolls);
         printfLog("F: %d  CR: %d\n", test_power, test_totalCrankRev);
