@@ -212,6 +212,7 @@ void loop() {
       else
       {
         blePublishPower(power, totalCrankRevs, timeNow);
+//        printfLog("Force=%.1f  Cad=%.1f\n", avgForce, avgRad);
       }
 
       // Reset the latest update to now.
