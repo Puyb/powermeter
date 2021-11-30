@@ -134,10 +134,10 @@ void setupPwr(void) {
   pwrFeatChar.setProperties(CHR_PROPS_READ);
   pwrFeatChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
   // 1 32-bit value
-  pwrFeatChar.setFixedLen(8);
+  pwrFeatChar.setFixedLen(4);
   pwrFeatChar.begin();
   // No extras for now, write 0.
-  pwrFeatChar.write32(0b01000);
+  pwrFeatChar.write32(0);
 
   // Characteristic for sensor location. Has to be readable, but not necessarily
   // notify. See:
