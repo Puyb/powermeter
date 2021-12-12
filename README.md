@@ -9,9 +9,10 @@ IMPLEMENTED:
 - Sleep + wakeup by gyro motion
 - Upgrade to latest Adafruit nRF52 version (supporting BLE multi)
 - Integrated calibration via Adafruit Bluefruit LE connect App (UART)
+- Persistant storage and retrieval of (calibration) settings via NVRAM
 
-TODO: 
-- Persistant storage and retrieval of (calibration) settings via NVRAM for feather boards
+For the complete work-instructions on how to implement this yourself, check the Wiki-pages here:
+https://gitlab.com/tbressers/power/-/wikis/Cycle-Power-Meter
 
 Thijs
 
