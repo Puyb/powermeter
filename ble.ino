@@ -7,6 +7,7 @@
  */
 
 #include <stdarg.h>
+#include <BLECharacteristic.h>
 
 // Service and character constants at:
 // https://github.com/adafruit/Adafruit_nRF52_Arduino/blob/bd0747473242d5d7c58ebc67ab0aa5098db56547/libraries/Bluefruit52Lib/src/BLEUuid.h

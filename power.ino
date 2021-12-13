@@ -6,18 +6,16 @@
 
 #include "Adafruit_MPU6050.h"
 #include "Adafruit_Sensor.h"
-#include "nrfx_nvmc.h"
 #include "board.h"
 #include <Wire.h>
 #include <bluefruit.h>
 #include <SPI.h>
 #include "HX711_ADC.h"
 
+
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
 #include <Adafruit_TinyUSB.h> // for Serial
-
-#include <BLECharacteristic.h>
 
 // Virtufit Etappe I
 //#define DEBUG
@@ -70,6 +68,7 @@ volatile long timeFirstSleepCheck=0;
 volatile long Sleepy=0;
 volatile int last_connection_count=0;
 volatile long connectedStart=0;
+volatile boolean newLoadDataReady=0;
 
 // Bluetooth
 int16_t test_power=0; // for testing
@@ -122,7 +121,6 @@ void setup() {
   gyroSetup();
   loadSetup();
   bleSetup();
-  getStoredCalibrationFactor();
 
   Serial.printf("Setup completed.\n\n");
   Serial.printf("Send 'c' from bluetooth or serial monitor to start calibration.\n\n");

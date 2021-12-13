@@ -108,25 +108,3 @@ void calibrateLoadCell() {
   printfLog("To re-calibrate, send 'c' from bluetooth or serial monitor.\n");
   printfLog("***\n\n");
 }
-
-void getStoredCalibrationFactor(void)
-{
-  InternalFS.begin();
-  file.open(CALIBRATIONS_FILENAME, FILE_O_READ);
-  if ( file )
-  {
-    uint32_t readlen;
-    readlen = file.read((char*)&nvram_settings, sizeof(nvram_settings));
-    file.close();
-
-   	LoadCell.setCalFactor(nvram_settings.load_multiplier);
-    LoadCell.setTareOffset(nvram_settings.load_offset);          
-
-    Serial.printf("Calibrations found.\n");
-    Serial.printf("Load offset set to: %d\n",nvram_settings.load_offset);
-    Serial.printf("Load multiplier set to: %f\n",nvram_settings.load_multiplier);	
-  } else
-  {
-    Serial.printf("No calibrations found!\n");
-  }
-}

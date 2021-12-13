@@ -32,8 +32,32 @@ void loadSetup() {
     while (1);
   }
   else {
-    LoadCell.setCalFactor(calibrationValue); // set calibration value (float)
-    Serial.printf("Load cell calibrated (value=%f)\n",calibrationValue);
+    InternalFS.begin();
+    file.open(CALIBRATIONS_FILENAME, FILE_O_READ);
+    if ( file )
+    {
+      uint32_t readlen;
+      readlen = file.read((char*)&nvram_settings, sizeof(nvram_settings));
+      file.close();
+  
+      LoadCell.setCalFactor(nvram_settings.load_multiplier);
+      LoadCell.setTareOffset(nvram_settings.load_offset);          
+  
+      Serial.printf("Calibrations found.\n");
+      Serial.printf("Load offset set to: %d\n",nvram_settings.load_offset);
+      Serial.printf("Load multiplier set to: %f\n",nvram_settings.load_multiplier); 
+    } else
+    {
+      Serial.printf("No calibrations found!\n");
+    }
+  }
+  attachInterrupt(digitalPinToInterrupt(HX711_dout), dataReadyISR, FALLING);
+}
+
+//interrupt routine:
+void dataReadyISR() {
+  if (LoadCell.update()) {
+    newLoadDataReady = 1;
   }
 }
 
@@ -44,8 +68,9 @@ void loadSetup() {
 float getAvgForce() {
   static float currentData = 0;
 
-  if (LoadCell.update()) {
+  if (newLoadDataReady) {
       currentData = LoadCell.getData() * HOOKEDUPLOADBACKWARDS;
+      newLoadDataReady=0;
   }
 
   return (currentData);
