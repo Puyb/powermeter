@@ -136,7 +136,7 @@ void gyroCheckSleepy(bool pedaling) {
       {
         int sleeptime=MILLIS_TO_SLEEP/(1000*60);
         timeFirstSleepCheck = millis();
-        printfLog("No activity. Going for a nap in %d minutes\n",sleeptime);
+//        printfLog("No activity. Going for a nap in %d minutes\n",sleeptime);
       }
     }
   }
