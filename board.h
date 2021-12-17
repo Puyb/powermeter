@@ -4,7 +4,9 @@
  */ 
 
 #define BOARD_PIN_A4 2 // MPU6050 (motion) interrupt
+#define BOARD_VBATPIN A6 // A6 Battery
 #define BOARD_PIN_DFU 34 // Secondary button (Feather Express boards only)
+
 
 /*    NRF52840 pin mapping
 

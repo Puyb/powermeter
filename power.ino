@@ -32,9 +32,6 @@
 // Milliseconds to wait before go to sleep: 900000 = 15 minutes 
 #define MILLIS_TO_SLEEP 900000 
 
-// A7 for Feather (non express)
-#define VBATPIN PIN_A6
-
 // The pause for the loop, and based on testing the actual
 // calls overhead take about 20ms themselves E.g. at 50ms delay,
 // that means a 50ms delay, plus 20ms to poll. So 70ms per loop,
@@ -116,6 +113,7 @@ void setup() {
   gyroSetup();
   loadSetup();
   bleSetup();
+  setupBattery();
 
   Serial.printf("Setup completed.\n\n");
   Serial.printf("Send 'c' from bluetooth or serial monitor to start calibration.\n\n");
@@ -163,12 +161,7 @@ void loop() {
         last_connection_count = connection_count;
         connectedStart = 0;
 
-        printfLog("=================\n");
-        printfLog("Power Cycle Meter\n");
-        printfLog("=================\n\n");
-        printfLog("Send 's' from bluetooth or serial monitor to show raw values.\n\n");
-        printfLog("Send 'f' from bluetooth or serial monitor to fake power & cadence.\n\n");
-        printfLog("Send 'c' from bluetooth or serial monitor to start calibration.\n\n");
+        printHelp();
       }
     }
 
@@ -212,8 +205,7 @@ void loop() {
       // And check the battery, don't need to do it nearly this often though.
       // 1000 ms / sec * 60 sec / min * 5 = 5 minutes
       if ((timeNow - lastInfrequentUpdate) > (1000 * 60 * 5)) {
-        float batPercent = checkBatt();
-        blePublishBatt(batPercent);
+        blePublishBatt();
         lastInfrequentUpdate = timeNow;
       }
     }
@@ -227,6 +219,7 @@ void loop() {
   char buf[64]={'\0'};
   GetUserInput(buf);
   if (buf[0] == 'c') calibrateLoadCell(); //calibrate
+  if (buf[0] == 'h') printHelp(); //calibrate
   if (buf[0] == 'f') {
     if (test_power > 0) {
       test_power = 0;
@@ -289,33 +282,17 @@ int16_t calcPower(double footSpeed, double force) {
   return (2 * force * footSpeed);
 }
 
-/**
+void printHelp() {
+  printfLog("=================\n");
+  printfLog("Power Cycle Meter\n");
+  printfLog("=================\n\n");
 
-*/
-uint8_t checkBatt() {
-  float measuredvbat = analogRead(VBATPIN);
-  measuredvbat *= 2;    // Board divided by 2, so multiply back
-  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-  measuredvbat /= 1024; // convert to voltage
-  // TODO would be cool to convert to an accurate percentage, but takes
-  // some science because I read it's not a linear discharge. For now
-  // make it super simple, based off this info from Adafruit:
-  //
-  // Lipoly batteries are 'maxed out' at 4.2V and stick around 3.7V
-  // for much of the battery life, then slowly sink down to 3.2V or
-  // so before the protection circuitry cuts it off. By measuring the
-  // voltage you can quickly tell when you're heading below 3.7V
-  if (measuredvbat > 4.1) {
-    return 100;
-  } else if (measuredvbat > 3.9) {
-    return 90;
-  } else if (measuredvbat > 3.7) {
-    return 70;
-  } else if (measuredvbat > 3.5) {
-    return 40;
-  } else if (measuredvbat > 3.3) {
-    return 20;
-  } else {
-    return 5;
-  }
+  blePublishBatt(); // Publish battery level to newly connected devices
+
+  printfLog("Commands:\n");
+  printfLog(" h : show this help text\n");
+  printfLog(" s : show raw values\n");
+  printfLog(" f : fake power & cadence\n");
+  printfLog(" c : calibrate load sensor\n");
+  printfLog("\n");
 }
