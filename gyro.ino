@@ -146,7 +146,7 @@ void gyroCheckSleepy(bool pedaling) {
     if(timeFirstSleepCheck > 0)
     {
       timeFirstSleepCheck=0;
-      printfLog("Activity detected. Sleep timer reset\n");
+//      printfLog("Activity detected. Sleep timer reset\n");
     }
   }
 }

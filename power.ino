@@ -17,25 +17,17 @@
 #include <InternalFileSystem.h>
 #include <Adafruit_TinyUSB.h> // for Serial
 
+#define DEV_NAME "Cycle Power Meter"
+#define gn 9.80665 // gravity constant
+
 // Virtufit Etappe I
 //#define DEBUG
-//#define BLE_LOGGING
-//#define CALIBRATE
-#define DISABLE_LOGGING  // to the SD
 // Crank length, in meters
 #define CRANK_RADIUS 0.1725
-#define LOAD_OFFSET 255904.f
-#define HX711_MULT  -2466.8989547
-#define GYRO_OFFSET -31
 // If the wires are hooked up backwards, the force is negated => -1
 // If it isn't, just set to 1.
 #define HOOKEDUPLOADBACKWARDS 1
-#define DEV_NAME "Cycle Power Meter"
 #define PWR_MEAS_CHAR_LEN 8
-
-#define CALIBRATIONS_FILENAME    "/calibrations.txt"
-
-// Universal defines
 
 // Milliseconds to wait before go to sleep: 900000 = 15 minutes 
 #define MILLIS_TO_SLEEP 900000 
@@ -76,6 +68,8 @@ int16_t test_power=0; // for testing
 uint16_t test_totalCrankRev=0; // for testing
 uint16_t test_totalCrankRev_inc=0; // for testing
 uint8_t connection_count = 0;
+
+#define CALIBRATIONS_FILENAME    "/calibrations.txt"
 
 typedef struct settings_struct {
   unsigned char calibrated; 
