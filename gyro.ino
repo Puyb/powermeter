@@ -188,6 +188,6 @@ float getNormalAvgVelocity() {
  *
  * Value returned is in meters/second
  */
-float getCircularVelocity(float rad) {
-  return (CRANK_RADIUS * rad / 2);
+float getCircularVelocity(float radi) {
+  return (CRANK_RADIUS * radi / 2);
 }

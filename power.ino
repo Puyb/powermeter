@@ -71,6 +71,7 @@ volatile long connectedStart=0;
 volatile boolean newLoadDataReady=0;
 
 // Bluetooth
+bool show_values=false; // print raw values
 int16_t test_power=0; // for testing
 uint16_t test_totalCrankRev=0; // for testing
 uint16_t test_totalCrankRev_inc=0; // for testing
@@ -86,8 +87,8 @@ typedef struct settings_struct {
 nvram_settings_struct nvram_settings;
 
 //HX711 pins:
-#define HX711_dout 4 //mcu > HX711 dout pin (from example)
-#define HX711_sck 5 //mcu > HX711 sck pin (from example)
+#define HX711_dout A0 //mcu > HX711 dout pin (was: 4)
+#define HX711_sck A1 //mcu > HX711 sck pin (was: 5)
 
 //HX711 constructor:
 HX711_ADC LoadCell(HX711_dout, HX711_sck);
@@ -152,11 +153,6 @@ void loop() {
   // Degrees per second
   rad = getNormalAvgVelocity();
   avgRad += rad;
-
-
-  // Now get force from the load cell.
-  avgForce = getAvgForce();
-
   numPolls += 1;
 
   
@@ -176,21 +172,21 @@ void loop() {
         printfLog("=================\n");
         printfLog("Power Cycle Meter\n");
         printfLog("=================\n\n");
-        printfLog("Send 'b' from bluetooth or serial monitor to start test.\n\n");
+        printfLog("Send 's' from bluetooth or serial monitor to show raw values.\n\n");
+        printfLog("Send 'f' from bluetooth or serial monitor to fake power & cadence.\n\n");
         printfLog("Send 'c' from bluetooth or serial monitor to start calibration.\n\n");
       }
     }
 
     if (timeSinceLastUpdate > updateTime(rad, &pedaling) && numPolls > 1) {
-
+      // Determine the average cadence 
       avgRad = avgRad / numPolls;
-      avgForce = avgForce / numPolls;
+
+      // Get the moving average force from the load cell (library)
+      avgForce = getAvgForce();
 
       float mps = getCircularVelocity(avgRad);
       int16_t power = calcPower(mps, avgForce);
-
-      // Just print these values to the serial, something easy to read.
-//      printfLog("Power: %d\n",power);
 
       // The time since last update, as published, is actually at
       // a resolution of 1/1024 seconds, per the spec. BLE will convert, just send
@@ -208,8 +204,10 @@ void loop() {
       }
       else
       {
+        if (show_values) {
+            printfLog("AvgForce=%.1f  Pwr=%d  Cad=%.1f\n", avgForce, power, avgRad);
+        }
         blePublishPower(power, totalCrankRevs, timeNow);
-//        printfLog("Force=%.1f  Cad=%.1f\n", avgForce, avgRad);
       }
 
       // Reset the latest update to now.
@@ -235,7 +233,24 @@ void loop() {
   char buf[64]={'\0'};
   GetUserInput(buf);
   if (buf[0] == 'c') calibrateLoadCell(); //calibrate
-  if (buf[0] == 'b') testBT(); //test bluetooth
+  if (buf[0] == 'f') {
+    if (test_power > 0) {
+      test_power = 0;
+      test_totalCrankRev = 0;
+      test_totalCrankRev_inc = 0;
+    }
+    else {
+      testBT(); //test bluetooth
+    }
+  }
+  if (buf[0] == 's') {
+    if (show_values) {
+      show_values = false;
+    }
+    else {
+      show_values = true;
+    }
+  }
   
   // Pass-through USB/Bluethooth (BLE) data
   //bleuart_data_transfer();

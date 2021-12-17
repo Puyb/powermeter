@@ -64,6 +64,7 @@ class HX711_ADC
 		void setCalFactor(float cal); 				//set new calibration factor, raw data is divided by this value to convert to readable data
 		float getCalFactor(); 						//returns the current calibration factor
 		float getData(); 							//returns data from the moving average dataset 
+		float getDataRaw(); 							//returns raw data from the moving average dataset 
 		int getReadIndex(); 						//for testing and debugging
 		float getConversionTime(); 					//for testing and debugging
 		float getSPS();								//for testing and debugging

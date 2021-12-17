@@ -17,40 +17,28 @@ void loadSetup() {
   Serial.println("Starting-up loadcell HX711...");
 
   LoadCell.begin();
-  float calibrationValue; // calibration value (see example file "Calibration.ino")
-  calibrationValue = 696.0; // uncomment this if you want to set the calibration value in the sketch
-#if defined(ESP8266)|| defined(ESP32)
-  //EEPROM.begin(512); // uncomment this if you use ESP8266/ESP32 and want to fetch the calibration value from eeprom
-#endif
-  //EEPROM.get(calVal_eepromAdress, calibrationValue); // uncomment this if you want to fetch the calibration value from eeprom
+  InternalFS.begin();
 
-  unsigned long stabilizingtime = 2000; // preciscion right after power-up can be improved by adding a few seconds of stabilizing time
-  boolean _tare = true; //set this to false if you don't want tare to be performed in the next step
-  LoadCell.start(stabilizingtime, _tare);
-  if (LoadCell.getTareTimeoutFlag()) {
-    Serial.println("Timeout, check MCU>HX711 wiring and pin designations");
-    while (1);
+  file.open(CALIBRATIONS_FILENAME, FILE_O_READ);
+  if ( file )
+  {
+    uint32_t readlen;
+    readlen = file.read((char*)&nvram_settings, sizeof(nvram_settings));
+    file.close();
+
+    if(nvram_settings.load_multiplier == 0) nvram_settings.load_multiplier = 640.0;
+
+    LoadCell.setCalFactor(nvram_settings.load_multiplier);
+    LoadCell.setTareOffset(nvram_settings.load_offset);          
+
+    Serial.printf("Calibrations found.\n");
+    Serial.printf("Load offset set to: %d\n",nvram_settings.load_offset);
+    Serial.printf("Load multiplier set to: %f\n",nvram_settings.load_multiplier); 
+  } else
+  {
+    Serial.printf("No calibrations found!\n");
   }
-  else {
-    InternalFS.begin();
-    file.open(CALIBRATIONS_FILENAME, FILE_O_READ);
-    if ( file )
-    {
-      uint32_t readlen;
-      readlen = file.read((char*)&nvram_settings, sizeof(nvram_settings));
-      file.close();
-  
-      LoadCell.setCalFactor(nvram_settings.load_multiplier);
-      LoadCell.setTareOffset(nvram_settings.load_offset);          
-  
-      Serial.printf("Calibrations found.\n");
-      Serial.printf("Load offset set to: %d\n",nvram_settings.load_offset);
-      Serial.printf("Load multiplier set to: %f\n",nvram_settings.load_multiplier); 
-    } else
-    {
-      Serial.printf("No calibrations found!\n");
-    }
-  }
+
   attachInterrupt(digitalPinToInterrupt(HX711_dout), dataReadyISR, FALLING);
 }
 
@@ -70,7 +58,6 @@ float getAvgForce() {
 
   if (newLoadDataReady) {
       currentData = LoadCell.getData() * HOOKEDUPLOADBACKWARDS;
-      newLoadDataReady=0;
   }
 
   return (currentData);

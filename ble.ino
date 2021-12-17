@@ -34,7 +34,7 @@ BLEUart bleuart;  // UART over BLE
 void bleSetup() {
 
   // off Blue LED for lowest power consumption
-  Bluefruit.autoConnLed(true);
+  Bluefruit.autoConnLed(false);
 
   Bluefruit.begin(MAX_PRPH_CONNECTION, 0);
   Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
@@ -102,9 +102,6 @@ void startAdv(void) {
 void setupPwr(void) {
   // Configure supported characteristics:
   pwrService.begin();
-
-  Bluefruit.autoConnLed(true);
-
 
   // Note: You must call .begin() on the BLEService before calling .begin() on
   // any characteristic(s) within that service definition.. Calling .begin() on

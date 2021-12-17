@@ -263,6 +263,15 @@ float HX711_ADC::getData() // return fresh data from the moving average dataset
 	return x;
 }
 
+float HX711_ADC::getDataRaw() // return fresh data from the moving average dataset
+{
+	long data = 0;
+	lastSmoothedData = smoothedData();
+	data = lastSmoothedData;
+	float x = (float)data;
+	return x;
+}
+
 long HX711_ADC::smoothedData() 
 {
 	long data = 0;
