@@ -75,7 +75,10 @@ void calibrateLoadCell() {
     }
   }
 
+  printfLog("Refreshing load sensor data..\n");
   LoadCell.refreshDataSet(); //refresh the dataset to be sure that the known mass is measured correct
+
+  printfLog("Please hold on while calibrating..\n");
   nvram_settings.load_multiplier = LoadCell.getNewCalibration(known_mass); //get and set the new calibration value
 
   printfLog("Load multiplier set to: %f\n\n",nvram_settings.load_multiplier);

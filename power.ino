@@ -116,7 +116,7 @@ void setup() {
   setupBattery();
 
   Serial.printf("Setup completed.\n\n");
-  Serial.printf("Send 'c' from bluetooth or serial monitor to start calibration.\n\n");
+  Serial.printf("Enter 'h' for help.\n\n");
   delay(200);
 }
 
@@ -186,13 +186,12 @@ void loop() {
       {
         test_totalCrankRev += test_totalCrankRev_inc;
         blePublishPower(test_power, test_totalCrankRev, timeNow);
-        printfLog("Force=%.1f  Cad=%.1f\n", avgForce, avgRad);
-        printfLog("TEST: Force=%d  Cad=%d\n", test_power, test_totalCrankRev);
+        printfLog("Fake: Force=%d  Cad=%d\n", test_power, test_totalCrankRev);
       }
       else
       {
         if (show_values) {
-            printfLog("AvgForce=%.1f  Pwr=%d  Cad=%.1f\n", avgForce, power, avgRad);
+            printfLog("%.1fN * %.1fm/s = %dW (Z=%0.1f)\n", avgForce, mps, power, getZtilt());
         }
         blePublishPower(power, totalCrankRevs, timeNow);
       }
@@ -218,8 +217,9 @@ void loop() {
 
   char buf[64]={'\0'};
   GetUserInput(buf);
-  if (buf[0] == 'c') calibrateLoadCell(); //calibrate
-  if (buf[0] == 'h') printHelp(); //calibrate
+  if (buf[0] == 'c') calibrateLoadCell();
+  if (buf[0] == 's') enterSleepMode();
+  if (buf[0] == 'h') printHelp(); 
   if (buf[0] == 'f') {
     if (test_power > 0) {
       test_power = 0;
@@ -230,7 +230,7 @@ void loop() {
       testBT(); //test bluetooth
     }
   }
-  if (buf[0] == 's') {
+  if (buf[0] == 'm') {
     if (show_values) {
       show_values = false;
     }
@@ -287,12 +287,15 @@ void printHelp() {
   printfLog("Power Cycle Meter\n");
   printfLog("=================\n\n");
 
+  printfLog("Load offset calibration: %d\n",nvram_settings.load_offset);
+  printfLog("Load multiplier calibration: %f\n",nvram_settings.load_multiplier); 
   blePublishBatt(); // Publish battery level to newly connected devices
 
   printfLog("Commands:\n");
-  printfLog(" h : show this help text\n");
-  printfLog(" s : show raw values\n");
-  printfLog(" f : fake power & cadence\n");
-  printfLog(" c : calibrate load sensor\n");
+  printfLog(" h : show this Help text\n");
+  printfLog(" m : Monitor power & cadence\n");
+  printfLog(" f : Fake power & cadence\n");
+  printfLog(" c : Calibrate load sensor\n");
+  printfLog(" s : enter Sleep mode\n");
   printfLog("\n");
 }

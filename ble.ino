@@ -306,6 +306,8 @@ void connectCallback(uint16_t connHandle) {
   Serial.printf("Connected to %s", centralName);
   Serial.printf("Connection count: %d", connection_count);
 
+  blePublishBatt(); // Publish battery level to newly connected device
+
   // Keep advertising if not reaching max
   if (connection_count < MAX_PRPH_CONNECTION)
   {

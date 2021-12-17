@@ -104,30 +104,7 @@ void gyroCheckSleepy(bool pedaling) {
   if (!pedaling) {
     if ((timeFirstSleepCheck > 0) && ((millis() - timeFirstSleepCheck) > MILLIS_TO_SLEEP)) 
     {
-//      detachInterrupt(digitalPinToInterrupt(GYRO_INT_PIN));
-      Bluefruit.autoConnLed(false);
-      digitalWrite(LED_CONN, LOW);
-      digitalWrite(LED_BUILTIN, LOW);
-
-      printfLog("Going to low-power mode..\n");
-      delay(1000);
-
-      // Power down loadcell
-      LoadCell.powerDown();
-
-      // Set zero motion detection at gyro MPU6050
-      mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
-      mpu.setMotionDetectionThreshold(1);
-      mpu.setMotionDetectionDuration(20);
-      mpu.setInterruptPinLatch(false);  
-      mpu.setInterruptPinPolarity(false); // active high
-      mpu.setMotionInterrupt(true);
-
-      // Enable wake-up by motion interrupt
-      pinMode(GYRO_INT_PIN, INPUT_PULLUP);
-      nrf_gpio_cfg_input(2,NRF_GPIO_PIN_NOPULL); 
-      nrf_gpio_cfg_sense_input(2, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
-      sd_power_system_off();
+      enterSleepMode();
     }
     else
     {
@@ -151,6 +128,32 @@ void gyroCheckSleepy(bool pedaling) {
   }
 }
 
+void enterSleepMode() {
+  Bluefruit.autoConnLed(false);
+  digitalWrite(LED_CONN, LOW);
+  digitalWrite(LED_BUILTIN, LOW);
+
+  printfLog("Going to low-power mode..\n");
+  delay(1000);
+
+  // Power down loadcell
+  LoadCell.powerDown();
+
+  // Set zero motion detection at gyro MPU6050
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
+  mpu.setMotionDetectionThreshold(1);
+  mpu.setMotionDetectionDuration(20);
+  mpu.setInterruptPinLatch(false);  
+  mpu.setInterruptPinPolarity(false); // active high
+  mpu.setMotionInterrupt(true);
+
+  // Enable wake-up by motion interrupt
+  pinMode(GYRO_INT_PIN, INPUT_PULLUP);
+  nrf_gpio_cfg_input(2,NRF_GPIO_PIN_NOPULL); 
+  nrf_gpio_cfg_sense_input(2, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
+  sd_power_system_off();
+}
+
 /**
  * Gets a normalized averaged rotational velocity calculation. The MPU6050 library supports a
  * normalized gyroscope reading, which trims off outliers and scales the values to deg/s.
@@ -162,14 +165,7 @@ void gyroCheckSleepy(bool pedaling) {
  * Returns a value for foot speed, in rad/second.
  */
 float getNormalAvgVelocity() {
-  /* Get new sensor events with the readings */
-  sensors_event_t a, g, temp;
-
-  mpu.getEvent(&a, &g, &temp);
-
-//  printfLog("%d %d %d\n", a.acceleration.x, a.acceleration.y, a.acceleration.z);
-
-  float rotz = abs(g.gyro.z);
+  float rotz = getZrot();
   if (rotz < (2*PI/4)) {
     // Magic number (90 degrees) here, but less than 90 dps is less than 1 crank rotation 
     // in 4 seconds (15 RPM), just assume it's noise from the road bumps.
@@ -177,6 +173,32 @@ float getNormalAvgVelocity() {
   }
 
   return rotz;
+}
+
+float getZrot() {
+  /* Get new sensor events with the readings */
+  sensors_event_t a, g, temp;
+
+  mpu.getEvent(&a, &g, &temp);
+
+//  printfLog("%d %d %d\n", a.acceleration.x, a.acceleration.y, a.acceleration.z);
+
+  return abs(g.gyro.z);
+}
+
+float getZtilt() {
+  /* Get new sensor events with the readings */
+  sensors_event_t a, g, temp;
+
+  mpu.getEvent(&a, &g, &temp);
+
+  double x_Buff = float(a.acceleration.x);
+  double y_Buff = float(a.acceleration.y);
+  double z_Buff = float(a.acceleration.z);
+  float roll = atan2(y_Buff , z_Buff) * 57.3;
+  float z = atan2((- x_Buff) , sqrt(y_Buff * y_Buff + z_Buff * z_Buff)) * 57.3;
+
+  return z;
 }
 
 /**
