@@ -38,6 +38,8 @@ void testBT() {
 void calibrateLoadCell() {
   char buf[64]={'\0'};
 
+  detachInterrupt(digitalPinToInterrupt(HX711_dout));
+
   printfLog("***\n");
   printfLog("Start calibration:\n");
   printfLog("Place the load cell a level stable surface.\n");
@@ -58,8 +60,7 @@ void calibrateLoadCell() {
     }
   }
 
-  printfLog("Now, place your known mass on the loadcell.\n");
-  printfLog("Then enter the weight of this mass in kg (i.e. 100):\n\n");
+  printfLog("Provide your exact weight in kg:\n\n");
 
   float known_mass = 0;
   _resume = false;
@@ -69,20 +70,32 @@ void calibrateLoadCell() {
     if (buf[0] != '\0') {
       known_mass = atof(buf);
       if (known_mass != 0) {
-        printfLog("Known mass is: %f\n",known_mass);
+        printfLog("Provided weight is %.1f kg (%.1f kg per pedal)\n",known_mass, known_mass/2);
         _resume = true;
       }
     }
+  }
+
+  printfLog("\nNow stand-up on your pedals,\n");
+  printfLog("evenly balancing your weight,\n");
+  printfLog("and press 's' to start calibration\n\n");
+
+  _resume = false;
+  while (_resume == false) {
+    GetUserInput(buf);
+    if (buf[0] == 's') _resume = true;
   }
 
   printfLog("Refreshing load sensor data..\n");
   LoadCell.refreshDataSet(); //refresh the dataset to be sure that the known mass is measured correct
 
   printfLog("Please hold on while calibrating..\n");
-  nvram_settings.load_multiplier = LoadCell.getNewCalibration(known_mass); //get and set the new calibration value
 
-  printfLog("Load multiplier set to: %f\n\n",nvram_settings.load_multiplier);
-  printfLog("Save calibration values? (y/n)\n");
+  // get and set the new calibration value (weight on left pedal, in Newtons)
+  nvram_settings.load_multiplier = LoadCell.getNewCalibration(gn * known_mass / 2); 
+
+  printfLog("Load multiplier set to: %.1f\n\n",nvram_settings.load_multiplier);
+  printfLog("\nSave calibration values? (y/n)\n\n");
 
   _resume = false;
   while (_resume == false) {
@@ -110,4 +123,6 @@ void calibrateLoadCell() {
   printfLog("***\n");
   printfLog("To re-calibrate, send 'c' from bluetooth or serial monitor.\n");
   printfLog("***\n\n");
+
+  attachInterrupt(digitalPinToInterrupt(HX711_dout), dataReadyISR, FALLING);
 }

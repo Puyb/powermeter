@@ -17,17 +17,14 @@
 #include <InternalFileSystem.h>
 #include <Adafruit_TinyUSB.h> // for Serial
 
+//#define DEBUG
+
 #define DEV_NAME "Cycle Power Meter"
 #define gn 9.80665 // gravity constant
 
-// Virtufit Etappe I
-//#define DEBUG
-// Crank length, in meters
+// Virtufit Etappe I: crank length, in meters
+// (to be added to the calibration procedure!)
 #define CRANK_RADIUS 0.1725
-// If the wires are hooked up backwards, the force is negated => -1
-// If it isn't, just set to 1.
-#define HOOKEDUPLOADBACKWARDS 1
-#define PWR_MEAS_CHAR_LEN 8
 
 // Milliseconds to wait before go to sleep: 900000 = 15 minutes 
 #define MILLIS_TO_SLEEP 900000 
@@ -44,10 +41,7 @@
 // if the value is 1000 (1 second), cadence under 60 RPM won't register.
 #define MIN_UPDATE_FREQ 1500
 
-// NOTE LED is automatically lit solid when connected,
-// we don't currently change it, default Feather behavior
-// is nice.
-// TODO Though not optimal for power, not sure how much it takes.
+// Pin-outs
 #define LED_PIN LED_BUILTIN
 #define SD_CS_PIN PIN_A3
 #define GYRO_INT_PIN A4
@@ -60,6 +54,7 @@ volatile long connectedStart=0;
 volatile boolean newLoadDataReady=0;
 
 // Bluetooth
+#define PWR_MEAS_CHAR_LEN 8 // Bluetooth package length
 bool show_values=false; // print raw values
 int16_t test_power=0; // for testing
 uint16_t test_totalCrankRev=0; // for testing
@@ -165,7 +160,7 @@ void loop() {
       }
     }
 
-    if (timeSinceLastUpdate > updateTime(rad, &pedaling) && numPolls > 1) {
+    if (timeSinceLastUpdate > updateTime(rad, &pedaling) && newLoadDataReady && numPolls > 1) {
       // Determine the average cadence 
       avgRad = avgRad / numPolls;
 

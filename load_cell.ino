@@ -57,7 +57,7 @@ float getAvgForce() {
   static float currentData = 0;
 
   if (newLoadDataReady) {
-      currentData = gn * LoadCell.getData() * HOOKEDUPLOADBACKWARDS;
+      currentData = abs(LoadCell.getData());
   }
 
   return (currentData);
