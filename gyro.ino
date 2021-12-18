@@ -47,7 +47,7 @@ void gyroSetup() {
     Serial.println("+-16G");
     break;
   }
-  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  mpu.setGyroRange(MPU6050_RANGE_2000_DEG);
   Serial.print("Gyro range set to: ");
   switch (mpu.getGyroRange()) {
   case MPU6050_RANGE_250_DEG:
@@ -166,9 +166,9 @@ void enterSleepMode() {
  */
 float getNormalAvgVelocity() {
   float rotz = getZrot();
-  if (rotz < (2*PI/4)) {
-    // Magic number (90 degrees) here, but less than 90 dps is less than 1 crank rotation 
-    // in 4 seconds (15 RPM), just assume it's noise from the road bumps.
+  if (rotz < (PI/4)) {
+    // Magic number (45 degrees) here, but less than 45 dps is less than 1 crank rotation 
+    // in 4 seconds (7 RPM), just assume it's noise from the road bumps.
     rotz = 0.f;
   }
 
@@ -201,15 +201,3 @@ float getZtilt() {
   return z;
 }
 
-/**
- * Provide the average rate, in degrees/second.
- *
- * Returns the circular velocity of the rider's foot. Takes in the crank's averaged rotational
- * velocity, converts it to radians, multiplies by the crank radius, and returns the converted
- * value.
- *
- * Value returned is in meters/second
- */
-float getCircularVelocity(float radi) {
-  return (CRANK_RADIUS * radi / 2);
-}

@@ -167,7 +167,8 @@ void loop() {
       // Get the moving average force from the load cell (library)
       avgForce = getAvgForce();
 
-      float mps = getCircularVelocity(avgRad);
+      // Get the circular velocity of the rider's foot in m/s
+      float mps = CRANK_RADIUS * avgRad / 2;
       int16_t power = calcPower(mps, avgForce);
 
       // The time since last update, as published, is actually at
@@ -283,7 +284,7 @@ void printHelp() {
   printfLog("=================\n\n");
 
   printfLog("Load offset calibration: %d\n",nvram_settings.load_offset);
-  printfLog("Load multiplier calibration: %f\n",nvram_settings.load_multiplier); 
+  printfLog("Load multiplier calibration: %.1f\n",nvram_settings.load_multiplier); 
   blePublishBatt(); // Publish battery level to newly connected devices
 
   printfLog("Commands:\n");

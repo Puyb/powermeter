@@ -42,9 +42,9 @@ void calibrateLoadCell() {
 
   printfLog("***\n");
   printfLog("Start calibration:\n");
-  printfLog("Place the load cell a level stable surface.\n");
-  printfLog("Remove any load applied to the load cell.\n");
-  printfLog("Send 't' to set the tare offset.\n\n");
+  printfLog("Step of the bike to ensure\n");
+  printfLog("there's no load on the pedals.\n\n");
+  printfLog("Then send 't' to set the tare offset.\n\n");
 
   boolean _resume = false;
   while (_resume == false) {
