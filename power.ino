@@ -20,6 +20,7 @@
 //#define DEBUG
 
 #define DEV_NAME "Cycle Power Meter"
+#define NRF52840_XXAA
 #define gn 9.80665 // gravity constant
 
 // Virtufit Etappe I: crank length, in meters
