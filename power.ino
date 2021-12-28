@@ -174,11 +174,10 @@ void loop() {
 
       // Get the circular velocity of the rider's foot in m/s
       float mps = CRANK_RADIUS * avgRad / 2;
-      int16_t power = calcPower(mps, avgForce);
 
-      // The time since last update, as published, is actually at
-      // a resolution of 1/1024 seconds, per the spec. BLE will convert, just send
-      // the time, in millis.
+      // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
+      int16_t power = 2 * mps * avgForce;
+
       if (pedaling) {
         totalCrankRevs += 1;
       }
@@ -271,16 +270,6 @@ float updateTime(float rad, bool *pedaling) {
   // we should be on average right on 1 rotation. We want to be within half of the overhead time
   // for a perfect 360 degrees.
   return (del - (0.5 * (LOOP_DELAY + 30)));
-}
-
-/**
-   Given the footspeed (angular velocity) and force, power falls out.
-
-   Returns the power, in watts. Force and distance over time.
-*/
-int16_t calcPower(double footSpeed, double force) {
-  // Multiply it all by 2, because we only have the sensor on 1/2 the cranks.
-  return (2 * force * footSpeed);
 }
 
 void printHelp() {

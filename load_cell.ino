@@ -61,6 +61,7 @@ float getAvgForce() {
 
   if (newLoadDataReady) {
       currentData = abs(LoadCell.getData());
+      newLoadDataReady = 0;
   }
 
   return (currentData);
