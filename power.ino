@@ -62,6 +62,8 @@ uint16_t test_totalCrankRev=0; // for testing
 uint16_t test_totalCrankRev_inc=0; // for testing
 uint8_t connection_count = 0;
 
+#define LOAD_OFFSET_DEFAULT 8736226
+#define LOAD_MULTIPLIER_DEFAULT 1747.2
 #define CALIBRATIONS_FILENAME    "/calibrations.txt"
 
 typedef struct settings_struct {
@@ -284,8 +286,11 @@ void printHelp() {
   printfLog("Power Cycle Meter\n");
   printfLog("=================\n\n");
 
+  if (nvram_settings.load_offset == LOAD_OFFSET_DEFAULT) {
+    printfLog("\nLoad-cell defaults loaded:\n");
+  }
   printfLog("Load offset calibration: %d\n",nvram_settings.load_offset);
-  printfLog("Load multiplier calibration: %.1f\n",nvram_settings.load_multiplier); 
+  printfLog("Load multiplier calibration: %.1f\n\n",nvram_settings.load_multiplier); 
   blePublishBatt(); // Publish battery level to newly connected devices
 
   printfLog("Commands:\n");

@@ -291,7 +291,7 @@ void blePublishBatt() {
 
   blebas.write(vbat_per);
 
-  printfLog("Battery level: %d %%  (voltage: %.3f V)\n\n", vbat_per, vbat_mv/1000.0);
+  printfLog("Battery level: %d%%  (voltage: %.3fV)\n\n", vbat_per, vbat_mv/1000.0);
 }
 
 void connectCallback(uint16_t connHandle) {

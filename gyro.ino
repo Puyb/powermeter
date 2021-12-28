@@ -47,7 +47,7 @@ void gyroSetup() {
     Serial.println("+-16G");
     break;
   }
-  mpu.setGyroRange(MPU6050_RANGE_2000_DEG);
+  mpu.setGyroRange(MPU6050_RANGE_1000_DEG);
   Serial.print("Gyro range set to: ");
   switch (mpu.getGyroRange()) {
   case MPU6050_RANGE_250_DEG:

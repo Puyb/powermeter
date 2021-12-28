@@ -26,7 +26,10 @@ void loadSetup() {
     readlen = file.read((char*)&nvram_settings, sizeof(nvram_settings));
     file.close();
 
-    if(nvram_settings.load_multiplier == 0) nvram_settings.load_multiplier = 640.0;
+    if(nvram_settings.load_multiplier == 0) {
+      nvram_settings.load_multiplier = LOAD_MULTIPLIER_DEFAULT;
+      nvram_settings.load_offset = LOAD_OFFSET_DEFAULT;
+    }
 
     LoadCell.setCalFactor(nvram_settings.load_multiplier);
     LoadCell.setTareOffset(nvram_settings.load_offset);          
