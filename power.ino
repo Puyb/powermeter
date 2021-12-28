@@ -2,6 +2,8 @@
    Main
    ====
 
+  Copy binary to output (dist) folder:
+  copy /Y ..\output\power.ino.zip dist
 */
 
 #include "Adafruit_MPU6050.h"
