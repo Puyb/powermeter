@@ -64,8 +64,8 @@ uint16_t test_totalCrankRev=0; // for testing
 uint16_t test_totalCrankRev_inc=0; // for testing
 uint8_t connection_count = 0;
 
-#define LOAD_OFFSET_DEFAULT 8736226
-#define LOAD_MULTIPLIER_DEFAULT 1747.2
+#define LOAD_OFFSET_DEFAULT 8745984
+#define LOAD_MULTIPLIER_DEFAULT 810.1
 #define CALIBRATIONS_FILENAME    "/calibrations.txt"
 
 typedef struct settings_struct {

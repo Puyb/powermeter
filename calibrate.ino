@@ -70,13 +70,15 @@ void calibrateLoadCell() {
     if (buf[0] != '\0') {
       known_mass = atof(buf);
       if (known_mass != 0) {
-        printfLog("Provided weight is %.1f kg (~%.1f kg per pedal)\n",known_mass, known_mass/2);
+        printfLog("Provided calibration weight is %.1f Newton\n\n",gn * known_mass);
         _resume = true;
       }
     }
   }
 
   printfLog("\nNow stand-up on your pedals,\n");
+  printfLog("\nwith the pedals horizontally,\n");
+  printfLog("\nthe load-sensor pedal to the front,\n");
   printfLog("evenly balancing your weight,\n");
   printfLog("and press 's' to start calibration\n\n");
 
@@ -86,16 +88,9 @@ void calibrateLoadCell() {
     if (buf[0] == 's') _resume = true;
   }
 
-  printfLog("Refreshing load sensor data..\n");
+  printfLog("Calibrating..\n");
   LoadCell.refreshDataSet(); //refresh the dataset to be sure that the known mass is measured correct
-
-  printfLog("Please hold on while calibrating..\n");
-
-  // get and set the new calibration value in Newtons
-  // WORKAROUND: Actually we should provide (gn * known_mass * 0.5) because the one load-cell
-  //             only measures half of your weight. But, either the calibration or the read-out
-  //             seems to half the value.
-  nvram_settings.load_multiplier = LoadCell.getNewCalibration(gn * known_mass * 1.0); 
+  nvram_settings.load_multiplier = LoadCell.getNewCalibration(gn * known_mass); // Get and set the new calibration value in in Newtons
 
   printfLog("Load multiplier set to: %.1f\n\n",nvram_settings.load_multiplier);
   printfLog("\nSave calibration values? (y/n)\n\n");
