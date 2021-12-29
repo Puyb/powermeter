@@ -23,24 +23,25 @@ void loadSetup() {
   if ( file )
   {
     uint32_t readlen;
+    Serial.printf("Calibrations found.\n");
     readlen = file.read((char*)&nvram_settings, sizeof(nvram_settings));
     file.close();
-
-    if(nvram_settings.load_multiplier == 0) {
-      nvram_settings.load_multiplier = LOAD_MULTIPLIER_DEFAULT;
-      nvram_settings.load_offset = LOAD_OFFSET_DEFAULT;
-    }
-
-    LoadCell.setCalFactor(nvram_settings.load_multiplier);
-    LoadCell.setTareOffset(nvram_settings.load_offset);          
-
-    Serial.printf("Calibrations found.\n");
-    Serial.printf("Load offset set to: %d\n",nvram_settings.load_offset);
-    Serial.printf("Load multiplier set to: %f\n",nvram_settings.load_multiplier); 
-  } else
+  }
+  else
   {
     Serial.printf("No calibrations found!\n");
   }
+
+  if(nvram_settings.load_multiplier == 0) {
+    nvram_settings.load_multiplier = LOAD_MULTIPLIER_DEFAULT;
+    nvram_settings.load_offset = LOAD_OFFSET_DEFAULT;
+  }
+
+  LoadCell.setCalFactor(nvram_settings.load_multiplier);
+  LoadCell.setTareOffset(nvram_settings.load_offset);          
+
+  Serial.printf("Load offset set to: %d\n",nvram_settings.load_offset);
+  Serial.printf("Load multiplier set to: %f\n",nvram_settings.load_multiplier); 
 
   attachInterrupt(digitalPinToInterrupt(HX711_dout), dataReadyISR, FALLING);
 }

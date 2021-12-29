@@ -102,6 +102,7 @@ void calibrateLoadCell() {
       if( file.open(CALIBRATIONS_FILENAME, FILE_O_WRITE) )
       {
         uint32_t readlen;
+        file.seek(0); // Overcome weird behaviour of LittleFS to always APPEND instead of OVERWRITE
         file.write((char*)&nvram_settings, sizeof(nvram_settings));
         file.close();
         Serial.printf("Calibrations saved.\n");
