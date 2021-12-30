@@ -1,36 +1,19 @@
-This is the complete code for a crank-based power meter, transmitting over BLE
-to a bike computer. The whole project is copied from Steve Jarvis website/gitlab
-and tested on 'Adafruit Bluefruit nRF52840 Feather Express' board 
+Do It Yourself (DIY) Cycle Power Meter
 
-IMPLEMENTED:
-- Reading of load and gyro sensors (by  Steve Jarvis)
-- Connecting and updating load and gyro info to bluetooth device (by Steve Jarvis)
-- UART over bluetooth to enable connection via the Adafruit Bluefruit LE connect App (iOS/Android)
-- Sleep + wakeup by gyro motion
-- Upgrade to latest Adafruit nRF52 version (supporting BLE multi)
-- Integrated calibration via Adafruit Bluefruit LE connect App (UART)
+This is the code for a crank-based power meter, transmitting over BLE to a bike computer. The whole project is based on Steve Jarvis website/gitlab with a couple of improvements (see gitlab link below) and tested on a 'Adafruit Bluefruit nRF52840 Feather Express' board.
 
-Todo:
-- Persistant storage and retrieval of (calibration) settings via NVRAM
+Please find the complete DIY work-instruction here:
 
-For the complete work-instructions on how to implement this yourself, check the Wiki-pages here:
-https://gitlab.com/tbressers/power/-/wikis/Cycle-Power-Meter
+https://gitlab.com/tbressers/power/-/wikis/home
 
+Best regards,
 Thijs
 
-
-Original text from Steve Jarvis:
-
-Schematics and a part list for the hardware, as well as 
-notes on calibrating, are on [the wiki](https://gitlab.com/sjarvis/powermeter/-/wikis/home).
-In all, it's a full instruction set for building your own cycling power meter,
-compatible with any bike computer that supports Bluetooth (i.e. any Wahoo
-or Garmin).
-
-This is a fun project and I trained with it just great for a year. It can handle the 
-bumps and (minor) hits from the road, but I did struggle to get it any kind of 
-water resistant. I'd say that was the biggest pain point. It's also not a super 
-attractive form factor, but function > form, right?!
+---
+The original text below from Steve Jarvis (probably) still holds, although the read-out
+currently is interrupt-driven which should give slightly better results. Furthermore,
+I've added the reading of the crank Z-tilt (via the monitor function), which is the
+basis of a crank Z-tilt based read-out. Original text:
 
 As far as accuracy, it's within a reasonable margin of error when compared with
 commercial units, and usually on the low side. As far as training goes, it's for 
