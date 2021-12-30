@@ -173,7 +173,7 @@ void loop() {
       avgForce = getAvgForce();
 
       // Get the circular velocity of the rider's foot in m/s
-      float mps = CRANK_RADIUS * avgRad / 2;
+      float mps = CRANK_RADIUS * avgRad; 
 
       // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
       int16_t power = 2 * mps * avgForce;
