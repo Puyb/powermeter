@@ -38,11 +38,14 @@
 // will get ~14 samples/second.
 #define LOOP_DELAY 70
 
-// Min pause How often to crunch numbers and publish an update (millis)
-// NOTE If this value is less than the time it takes for one crank
-// rotation, we will not report a crank revolution. In other words,
-// if the value is 1000 (1 second), cadence under 60 RPM won't register.
-#define MIN_UPDATE_FREQ 1500
+// HX711 on-board hardware switch default is 10 Hz (alternative: 80 Hz)
+#define HX711_RATE 10 
+
+// With the default HX711_RATE of 10 Hz, we want at least 15 samples for a valid measurement
+#define MIN_UPDATE_TIME 1500
+
+// If the number of radians per seconds is less than this, we assume the user stopped pedaling
+#define STAND_STILL_RPS (0.25 * PI)
 
 // Pin-outs
 #define LED_PIN LED_BUILTIN
@@ -123,6 +126,8 @@ void setup() {
 void loop() {
   // Vars for polling footspeed
   static float avgRad = 0.f;
+  static float avgRad_prev = PI; // ensure a non-zero value
+  
   static float rad=0.f;
   // Cadence is calculated by increasing total revolutions.
   // TODO it's possible this rolls over, about 12 hours at 90RPM for 16 bit unsigned.
@@ -139,9 +144,9 @@ void loop() {
   static int16_t numPolls = 0;
   bool pedaling = false;
 
-  // During every loop, we just want to get samples to calculate
-  // one power/cadence update every interval we update the central.
-  
+  float Zroll, Ztilt; 
+
+
   // Degrees per second
   rad = getNormalAvgVelocity();
   avgRad += rad;
@@ -154,6 +159,7 @@ void loop() {
     long timeNow = millis();
     long timeSinceLastUpdate = timeNow - lastUpdate;
    
+    // Print help text after an arbitrary wait time (to allow the user to press UART in the App)
     if(connection_count != last_connection_count) {
       if (connectedStart == 0) connectedStart = millis();
       if((millis() - connectedStart) > (1000*6))
@@ -165,9 +171,21 @@ void loop() {
       }
     }
 
-    if (timeSinceLastUpdate > updateTime(rad, &pedaling) && newLoadDataReady && numPolls > 1) {
-      // Determine the average cadence 
+    // Check if we're ready for a new update
+    //  - Ensure minimum 2 seconds of measurements (~ 20 samples from load-sensor)
+    //  - Ensure near horizontal position
+    getZtilt(&Zroll, &Ztilt);
+    if ((timeSinceLastUpdate >= 2000) && (Ztilt > -5) && (Ztilt < 5) && (Zroll > -95) && (Zroll < -85)) {  
+      if (avgRad_prev > STAND_STILL_RPS) {
+        pedaling = true;
+      }
+      else {
+        pedaling = false;
+      }
+
+      // Get and store the last-measured cadence to determine the next update time
       avgRad = avgRad / numPolls;
+      avgRad_prev = avgRad;
 
       // Get the moving average force from the load cell (library)
       avgForce = getAvgForce();
@@ -191,7 +209,7 @@ void loop() {
       else
       {
         if (show_values) {
-            printfLog("%.1fN * %.1fm/s = %dW (Z=%0.1f)\n", avgForce, mps, power, getZtilt());
+            printfLog("%.1fN * %.2fm/s = %dW (Z=%0.1f, R=%0.1f, p=%d)\n", avgForce, mps, power, Ztilt, Zroll, numPolls);
         }
         blePublishPower(power, totalCrankRevs, timeNow);
       }
@@ -259,17 +277,18 @@ void loop() {
 */
 float updateTime(float rad, bool *pedaling) {
   // So knowing the dps, how long for 360 degrees?
-  float del = min(MIN_UPDATE_FREQ, 1000.f * ((2*PI) / rad));
-  if (del < MIN_UPDATE_FREQ) {
+  float my_delay = min(MIN_UPDATE_TIME, 1000.f * (2*PI) / rad);
+  if (rad > STAND_STILL_RPS) {
     // Let the caller know we didn't just hit the max pause,
     // the cranks are spinning.
     *pedaling = true;
   }
-  // Because need to account for delay, on average get 1 rotation. Empirically the overhead
-  // for calls in the loop is about 20 ms, plus the coded loop delay. If we account for half of that,
-  // we should be on average right on 1 rotation. We want to be within half of the overhead time
-  // for a perfect 360 degrees.
-  return (del - (0.5 * (LOOP_DELAY + 30)));
+  else {
+    // We're not spinning
+    *pedaling = false;
+  }
+
+  return (my_delay);
 }
 
 void printHelp() {

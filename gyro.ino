@@ -186,7 +186,41 @@ float getZrot() {
   return abs(g.gyro.z);
 }
 
-float getZtilt() {
+// TODO: Implement QUATERNION routines (for 360 degrees Ztilt instead of +90/-90) from here:
+//       https://github.com/jrowberg/i2cdevlib/blob/master/Arduino/MPU6050/examples/MPU6050_DMP6/MPU6050_DMP6.ino
+
+/*       -> Include gravity (in #else statement)
+
+#ifdef USE_OLD_DMPGETYAWPITCHROLL
+uint8_t MPU6050_6Axis_MotionApps20::dmpGetYawPitchRoll(float *data, Quaternion *q, VectorFloat *gravity) {
+    // yaw: (about Z axis)
+    data[0] = atan2(2*q -> x*q -> y - 2*q -> w*q -> z, 2*q -> w*q -> w + 2*q -> x*q -> x - 1);
+    // pitch: (nose up/down, about Y axis)
+    data[1] = atan(gravity -> x / sqrt(gravity -> y*gravity -> y + gravity -> z*gravity -> z));
+    // roll: (tilt left/right, about X axis)
+    data[2] = atan(gravity -> y / sqrt(gravity -> x*gravity -> x + gravity -> z*gravity -> z));
+    return 0;
+}
+#else 
+uint8_t MPU6050_6Axis_MotionApps20::dmpGetYawPitchRoll(float *data, Quaternion *q, VectorFloat *gravity) {
+    // yaw: (about Z axis)
+    data[0] = atan2(2*q -> x*q -> y - 2*q -> w*q -> z, 2*q -> w*q -> w + 2*q -> x*q -> x - 1);
+    // pitch: (nose up/down, about Y axis)
+    data[1] = atan2(gravity -> x , sqrt(gravity -> y*gravity -> y + gravity -> z*gravity -> z));
+    // roll: (tilt left/right, about X axis)
+    data[2] = atan2(gravity -> y , gravity -> z);
+    if (gravity -> z < 0) {
+        if(data[1] > 0) {
+            data[1] = PI - data[1]; 
+        } else { 
+            data[1] = -PI - data[1];
+        }
+    }
+    return 0;
+}
+#endif
+*/
+void getZtilt(float *roll, float *z) {
   /* Get new sensor events with the readings */
   sensors_event_t a, g, temp;
 
@@ -195,9 +229,7 @@ float getZtilt() {
   double x_Buff = float(a.acceleration.x);
   double y_Buff = float(a.acceleration.y);
   double z_Buff = float(a.acceleration.z);
-  float roll = atan2(y_Buff , z_Buff) * 57.3;
-  float z = atan2((- x_Buff) , sqrt(y_Buff * y_Buff + z_Buff * z_Buff)) * 57.3;
-
-  return z;
+  *roll = atan2(y_Buff , z_Buff) * 57.3;
+  *z = atan2((- x_Buff) , sqrt(y_Buff * y_Buff + z_Buff * z_Buff)) * 57.3;
 }
 
