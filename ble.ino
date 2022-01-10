@@ -275,21 +275,21 @@ void blePublishPower(int16_t instantPwr, uint16_t crankRevs, long millisLast) {
                                          lastTime[0], lastTime[1] };
   //uint8_t pwrdata[4] = { flags[0], flags[1], pwr[0], pwr[1] };
 
-  if (!pwrMeasChar.notify(pwrdata, sizeof(pwrdata))) {
-//    printfLog("ERROR: Power notify not set in the CCCD or not connected!\n");
+  if (connection_count > 0) {
+    if (!pwrMeasChar.notify(pwrdata, sizeof(pwrdata))) {
+  //    printfLog("ERROR: Power notify not set in the CCCD or not connected!\n");
+    }
   }
-
-  //Log.notice("BLE published flags: %X %X pwr: %X %X cranks: %X %X last time: %X %X\n", 
-  //           pwrdata[0], pwrdata[1], pwrdata[2], pwrdata[3], pwrdata[4], pwrdata[5], pwrdata[6], pwrdata[7]);
 }
 
 void blePublishBatt() {
   float vbat_mv = readVBAT();
 
+
   // Convert from raw mv to percentage (based on LIPO chemistry)
   uint8_t vbat_per = mvToPercent(vbat_mv);
 
-  blebas.write(vbat_per);
+  if (connection_count > 0) blebas.write(vbat_per);
 
   printfLog("Battery level: %d%%  (voltage: %.3fV)\n\n", vbat_per, vbat_mv/1000.0);
 }

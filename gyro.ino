@@ -154,27 +154,6 @@ void enterSleepMode() {
   sd_power_system_off();
 }
 
-/**
- * Gets a normalized averaged rotational velocity calculation. The MPU6050 library supports a
- * normalized gyroscope reading, which trims off outliers and scales the values to deg/s.
- *
- * An exponential average is applied to further smooth data, with weight of WEIGHT. I don't
- * love this, becaues it means no value is every entirely discarded, but exponential decay
- * probably makes it effectively the same. Maybe something to revisit.
- *
- * Returns a value for foot speed, in rad/second.
- */
-float getNormalAvgVelocity() {
-  float rotz = getZrot();
-  if (rotz < (PI/4)) {
-    // Magic number (45 degrees) here, but less than 45 dps is less than 1 crank rotation 
-    // in 4 seconds (7 RPM), just assume it's noise from the road bumps.
-    rotz = 0.f;
-  }
-
-  return rotz;
-}
-
 float getZrot() {
   /* Get new sensor events with the readings */
   sensors_event_t a, g, temp;
@@ -183,7 +162,7 @@ float getZrot() {
 
 //  printfLog("%d %d %d\n", a.acceleration.x, a.acceleration.y, a.acceleration.z);
 
-  return abs(g.gyro.z);
+  return abs(g.gyro.z); // should this be abs????
 }
 
 // TODO: Implement QUATERNION routines (for 360 degrees Ztilt instead of +90/-90) from here:

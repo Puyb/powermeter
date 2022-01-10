@@ -32,17 +32,16 @@
 // Milliseconds to wait before go to sleep: 900000 = 15 minutes 
 #define MILLIS_TO_SLEEP 900000 
 
-// The pause for the loop, and based on testing the actual
-// calls overhead take about 20ms themselves E.g. at 50ms delay,
-// that means a 50ms delay, plus 20ms to poll. So 70ms per loop,
-// will get ~14 samples/second.
-#define LOOP_DELAY 70
-
 // HX711 on-board hardware switch default is 10 Hz (alternative: 80 Hz)
 #define HX711_RATE 10 
 
-// With the default HX711_RATE of 10 Hz, we want at least 15 samples for a valid measurement
-#define MIN_UPDATE_TIME 1500
+// The window in which the crank position (tilt and roll) is assumed to be located in the 'measuring position'
+// (crank with measurement device horizontal to the front) in rotational degrees
+#define CRANK_POSITION_WINDOW 6
+
+// Maximum time that the crank is in the measurement-position per crank-rotation (in ms)
+// Note that this depends on the CRANK_POSITION_WINDOW
+#define MAX_CRANK_MEASUREMENT_WINDOW 2000
 
 // If the number of radians per seconds is less than this, we assume the user stopped pedaling
 #define STAND_STILL_RPS (0.25 * PI)
@@ -55,9 +54,10 @@
 // Interrupt related variables (must be volatile)
 volatile long timeFirstSleepCheck=0;
 volatile long Sleepy=0;
-volatile int last_connection_count=0;
 volatile long connectedStart=0;
 volatile boolean newLoadDataReady=0;
+volatile uint8_t connection_count = 0; // bluetooth connection count
+volatile int last_connection_count=0; // for automatically printing the help text
 
 // Bluetooth
 #define PWR_MEAS_CHAR_LEN 8 // Bluetooth package length
@@ -65,7 +65,6 @@ bool show_values=false; // print raw values
 int16_t test_power=0; // for testing
 uint16_t test_totalCrankRev=0; // for testing
 uint16_t test_totalCrankRev_inc=0; // for testing
-uint8_t connection_count = 0;
 
 #define LOAD_OFFSET_DEFAULT 8745984
 #define LOAD_MULTIPLIER_DEFAULT 810.1
@@ -124,68 +123,63 @@ void setup() {
 }
 
 void loop() {
-  // Vars for polling footspeed
-  static float avgRad = 0.f;
-  static float avgRad_prev = PI; // ensure a non-zero value
-  
-  static float rad=0.f;
   // Cadence is calculated by increasing total revolutions.
   // TODO it's possible this rolls over, about 12 hours at 90RPM for 16 bit unsigned.
   static uint16_t totalCrankRevs = 0;
+
+  // Moving average of the velocity in rad/second
+  float avgRad = 0;
+
   // Vars for force
   static float avgForce = 0.f;
 
   // We only publish every once-in-a-while.
-  static long lastUpdate = millis();
+  static long lastMeasurement = millis();
+  static long lastStopMessage = millis();
+
   // Other things (like battery) might be on a longer update schedule for power.
   static long lastInfrequentUpdate = millis();
-  // To find the average values to use, count the num of samples
-  // between updates.
-  static int16_t numPolls = 0;
-  bool pedaling = false;
 
+  bool pedaling = false;
   float Zroll, Ztilt; 
 
+  // Get moving average velocity in rad per second
+  avgRad = MA_cadence(getZrot());
 
-  // Degrees per second
-  rad = getNormalAvgVelocity();
-  avgRad += rad;
-  numPolls += 1;
+  // Ensure we do not measure more than once per crank-rotation 
+  if ((millis() - lastMeasurement) >= MAX_CRANK_MEASUREMENT_WINDOW) {
 
-  
-//  if (Bluefruit.connected()) {
-  if (connection_count > 0) {
-    // We have a central connected
-    long timeNow = millis();
-    long timeSinceLastUpdate = timeNow - lastUpdate;
-   
-    // Print help text after an arbitrary wait time (to allow the user to press UART in the App)
-    if(connection_count != last_connection_count) {
-      if (connectedStart == 0) connectedStart = millis();
-      if((millis() - connectedStart) > (1000*6))
-      {
-        last_connection_count = connection_count;
-        connectedStart = 0;
-
-        printHelp();
-      }
-    }
-
-    // Check if we're ready for a new update
-    //  - Ensure minimum 2 seconds of measurements (~ 20 samples from load-sensor)
-    //  - Ensure near horizontal position
+    // Get the crank Z position
     getZtilt(&Zroll, &Ztilt);
-    if ((timeSinceLastUpdate >= 2000) && (Ztilt > -5) && (Ztilt < 5) && (Zroll > -95) && (Zroll < -85)) {  
-      if (avgRad_prev > STAND_STILL_RPS) {
-        pedaling = true;
-      }
-      else {
-        pedaling = false;
+    
+    // Check if we stopped pedaling every 2000 ms
+    if ((avgRad < STAND_STILL_RPS) &&
+        ((millis() - lastStopMessage) >= 2000)) {
+      // Reset timer
+      lastStopMessage = millis();
+
+      // Reset timer to prevent false error message when we start pedaling again
+      lastMeasurement = millis() - MAX_CRANK_MEASUREMENT_WINDOW;
+
+      // We are not pedaling. Report this to the bluetooth host
+      blePublishPower(0, totalCrankRevs, millis()); // zero power, no cadence (resend same totalCrankRevs)
+      if (show_values) {
+          printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f, STOP)\n", getAvgForce(), CRANK_RADIUS * avgRad, 0, Ztilt, Zroll);
       }
 
-      // Get and store the last-measured cadence to determine the next update time
-      avgRad = avgRad / numPolls;
-      avgRad_prev = avgRad;
+      // Input for sleep timer
+      pedaling = false;
+    }
+    // We are pedaling => Check if we reached the measuring position 
+    else if ((Ztilt > 0-(CRANK_POSITION_WINDOW/2)) && (Ztilt < 0+(CRANK_POSITION_WINDOW/2)) && 
+             (Zroll > -90-(CRANK_POSITION_WINDOW/2)) && (Zroll < -90+(CRANK_POSITION_WINDOW/2))) {  
+
+      // Reset the timer
+      lastMeasurement = millis();
+
+      // We are pedaling. Update the counter for the bluetooth host
+      pedaling = true;
+      totalCrankRevs++;
 
       // Get the moving average force from the load cell (library)
       avgForce = getAvgForce();
@@ -196,34 +190,64 @@ void loop() {
       // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
       int16_t power = 2 * mps * avgForce;
 
-      if (pedaling) {
-        totalCrankRevs += 1;
-      }
-      
       if((test_power>0) || (test_totalCrankRev_inc>0))
       {
         test_totalCrankRev += test_totalCrankRev_inc;
-        blePublishPower(test_power, test_totalCrankRev, timeNow);
+        blePublishPower(test_power, test_totalCrankRev, millis());
         printfLog("Fake: Force=%d  Cad=%d\n", test_power, test_totalCrankRev);
       }
       else
       {
         if (show_values) {
-            printfLog("%.1fN * %.2fm/s = %dW (Z=%0.1f, R=%0.1f, p=%d)\n", avgForce, mps, power, Ztilt, Zroll, numPolls);
+            printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f)\n", avgForce, mps, power, Ztilt, Zroll);
         }
-        blePublishPower(power, totalCrankRevs, timeNow);
+        blePublishPower(power, totalCrankRevs, millis());
       }
+    }
+    // If the pedals are moving, check if we missed too many measurement positions
+    else if ((avgRad >= STAND_STILL_RPS) && ((millis() - lastMeasurement) >= 8000)) {
+      // Reset timer for just this error message (not for a new measurement position)
+      lastMeasurement = millis() - MAX_CRANK_MEASUREMENT_WINDOW;
 
-      // Reset the latest update to now.
-      lastUpdate = timeNow;
-      // Let the averages from this polling period just carry over.
-      numPolls = 1;
+      // Report ERROR situation
+      printfLog("ERROR: Pedaling but no measurement position detected within 8 seconds. Try to increase CRANK_POSITION_WINDOW (hard-coded).\n");
 
-      // And check the battery, don't need to do it nearly this often though.
-      // 1000 ms / sec * 60 sec / min * 5 = 5 minutes
-      if ((timeNow - lastInfrequentUpdate) > (1000 * 60 * 5)) {
-        blePublishBatt();
-        lastInfrequentUpdate = timeNow;
+      printfLog("%.1fN, %.1frad/s, Z=%0.0f/%0.0f\n", getAvgForce(), getZrot(), Ztilt, Zroll);
+    }
+
+    // Print help text on bluetooth connection
+    printHelpOnConnect();
+
+    // Check the battery: don't need to do it nearly this often though.
+    // 1000 ms / sec * 60 sec / min * 5 = 5 minutes
+    if ((millis() - lastInfrequentUpdate) > (1000 * 60 * 5)) {
+      blePublishBatt();
+      lastInfrequentUpdate = millis();
+    }
+
+    // Check if we can go to sleep
+    gyroCheckSleepy(pedaling);
+  }
+
+  // Read user input
+  readUserInput();
+  
+  // Request CPU to enter low-power mode until an event/interrupt occurs
+  // but mind this bug: https://github.com/adafruit/Adafruit_nRF52_Arduino/issues/637
+  waitForEvent();
+}
+
+// Print help text after an arbitrary wait time (to allow the user to press UART in the App)
+void printHelpOnConnect() {
+  if (connection_count > 0) {
+    if(connection_count != last_connection_count) {
+      if (connectedStart == 0) connectedStart = millis();
+      if((millis() - connectedStart) > (1000*6))
+      {
+        last_connection_count = connection_count;
+        connectedStart = 0;
+
+        printHelp();
       }
     }
   }
@@ -231,8 +255,33 @@ void loop() {
   {
     last_connection_count = 0;
   }
+}
 
+void printHelp() {
+  printfLog("=================\n");
+  printfLog("Power Cycle Meter\n");
+  printfLog("=================\n\n");
 
+  if (nvram_settings.load_offset == LOAD_OFFSET_DEFAULT) {
+    printfLog("\nLoad-cell defaults loaded:\n");
+  }
+  printfLog("Load offset calibration: %d\n",nvram_settings.load_offset);
+  printfLog("Load multiplier calibration: %.1f\n\n",nvram_settings.load_multiplier); 
+  blePublishBatt(); // Publish battery level to newly connected devices
+
+  printfLog("Commands:\n");
+  printfLog(" h : show this Help text\n");
+  printfLog(" m : Monitor power & cadence\n");
+  printfLog(" f : Fake power & cadence\n");
+  printfLog(" c : Calibrate load sensor\n");
+  printfLog(" s : enter Sleep mode\n");
+  printfLog("\n");
+}
+
+//
+// Read user input (via serial and/or bluetooth)
+//
+void readUserInput() {
   char buf[64]={'\0'};
   GetUserInput(buf);
   if (buf[0] == 'c') calibrateLoadCell();
@@ -256,58 +305,29 @@ void loop() {
       show_values = true;
     }
   }
-  
-  // Pass-through USB/Bluethooth (BLE) data
-  //bleuart_data_transfer();
-
-  // Should we go to sleep?
-  gyroCheckSleepy(pedaling);
-
-  delay(LOOP_DELAY);
-
-// Request CPU to enter low-power mode until an event/interrupt occurs
-//  waitForEvent();
 }
 
-/**
-   Figure out how long to sleep in the loops. We'd like to tie the update interval
-   to the cadence, but if they stop pedaling need some minimum.
+float MA_cadence(float value) {
+  const byte nvalues = 64;            // Arbitrary number for the moving average window size
 
-   Return update interval, in milliseconds.
-*/
-float updateTime(float rad, bool *pedaling) {
-  // So knowing the dps, how long for 360 degrees?
-  float my_delay = min(MIN_UPDATE_TIME, 1000.f * (2*PI) / rad);
-  if (rad > STAND_STILL_RPS) {
-    // Let the caller know we didn't just hit the max pause,
-    // the cranks are spinning.
-    *pedaling = true;
-  }
-  else {
-    // We're not spinning
-    *pedaling = false;
-  }
+  static byte current = 0;            // Index for current value
+  static byte cvalues = 0;            // Count of values read (<= nvalues)
+  static float sum = 0;               // Rolling sum
+  static float values[nvalues];
 
-  return (my_delay);
-}
+  sum += value;
 
-void printHelp() {
-  printfLog("=================\n");
-  printfLog("Power Cycle Meter\n");
-  printfLog("=================\n\n");
+  // If the window is full, adjust the sum by deleting the oldest value
+  if (cvalues == nvalues)
+    sum -= values[current];
 
-  if (nvram_settings.load_offset == LOAD_OFFSET_DEFAULT) {
-    printfLog("\nLoad-cell defaults loaded:\n");
-  }
-  printfLog("Load offset calibration: %d\n",nvram_settings.load_offset);
-  printfLog("Load multiplier calibration: %.1f\n\n",nvram_settings.load_multiplier); 
-  blePublishBatt(); // Publish battery level to newly connected devices
+  values[current] = value;          // Replace the oldest with the latest
 
-  printfLog("Commands:\n");
-  printfLog(" h : show this Help text\n");
-  printfLog(" m : Monitor power & cadence\n");
-  printfLog(" f : Fake power & cadence\n");
-  printfLog(" c : Calibrate load sensor\n");
-  printfLog(" s : enter Sleep mode\n");
-  printfLog("\n");
+  if (++current >= nvalues)
+    current = 0;
+
+  if (cvalues < nvalues)
+    cvalues += 1;
+
+  return sum/cvalues;
 }
