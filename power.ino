@@ -37,11 +37,11 @@
 
 // The window in which the crank position (tilt and roll) is assumed to be located in the 'measuring position'
 // (crank with measurement device horizontal to the front) in rotational degrees
-#define CRANK_POSITION_WINDOW 6
+#define CRANK_POSITION_WINDOW 10
 
-// Maximum time that the crank is in the measurement-position per crank-rotation (in ms)
-// Note that this depends on the CRANK_POSITION_WINDOW
-#define MAX_CRANK_MEASUREMENT_WINDOW 2000
+// To check if we reached the opposite position of the measuring position 
+// for this we allow a 90 degrees (+/-45) detection window, because precision doesn't matter here
+#define CRANK_OPP_POSITION_WINDOW 90
 
 // If the number of radians per seconds is less than this, we assume the user stopped pedaling
 #define STAND_STILL_RPS (0.25 * PI)
@@ -126,6 +126,7 @@ void loop() {
   // Cadence is calculated by increasing total revolutions.
   // TODO it's possible this rolls over, about 12 hours at 90RPM for 16 bit unsigned.
   static uint16_t totalCrankRevs = 0;
+  static bool oppositeOfMeasurementPositionReached = false;
 
   // Moving average of the velocity in rad/second
   float avgRad = 0;
@@ -146,88 +147,94 @@ void loop() {
   // Get moving average velocity in rad per second
   avgRad = MA_cadence(getZrot());
 
-  // Ensure we do not measure more than once per crank-rotation 
-  if ((millis() - lastMeasurement) >= MAX_CRANK_MEASUREMENT_WINDOW) {
+  // Get the crank Z position
+  getZtilt(&Zroll, &Ztilt);
+  
+  // Check if we stopped pedaling every 2000 ms
+  if ((avgRad < STAND_STILL_RPS) &&
+      ((millis() - lastStopMessage) >= 2000)) {
+    // Reset timer
+    lastStopMessage = millis();
 
-    // Get the crank Z position
-    getZtilt(&Zroll, &Ztilt);
-    
-    // Check if we stopped pedaling every 2000 ms
-    if ((avgRad < STAND_STILL_RPS) &&
-        ((millis() - lastStopMessage) >= 2000)) {
-      // Reset timer
-      lastStopMessage = millis();
+    // Reset timer to prevent false error message when we start pedaling again
+    lastMeasurement = millis();
 
-      // Reset timer to prevent false error message when we start pedaling again
-      lastMeasurement = millis() - MAX_CRANK_MEASUREMENT_WINDOW;
-
-      // We are not pedaling. Report this to the bluetooth host
-      blePublishPower(0, totalCrankRevs, millis()); // zero power, no cadence (resend same totalCrankRevs)
-      if (show_values) {
-          printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f, STOP)\n", getAvgForce(), CRANK_RADIUS * avgRad, 0, Ztilt, Zroll);
-      }
-
-      // Input for sleep timer
-      pedaling = false;
-    }
-    // We are pedaling => Check if we reached the measuring position 
-    else if ((Ztilt > 0-(CRANK_POSITION_WINDOW/2)) && (Ztilt < 0+(CRANK_POSITION_WINDOW/2)) && 
-             (Zroll > -90-(CRANK_POSITION_WINDOW/2)) && (Zroll < -90+(CRANK_POSITION_WINDOW/2))) {  
-
-      // Reset the timer
-      lastMeasurement = millis();
-
-      // We are pedaling. Update the counter for the bluetooth host
-      pedaling = true;
-      totalCrankRevs++;
-
-      // Get the moving average force from the load cell (library)
-      avgForce = getAvgForce();
-
-      // Get the circular velocity of the rider's foot in m/s
-      float mps = CRANK_RADIUS * avgRad; 
-
-      // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
-      int16_t power = 2 * mps * avgForce;
-
-      if((test_power>0) || (test_totalCrankRev_inc>0))
-      {
-        test_totalCrankRev += test_totalCrankRev_inc;
-        blePublishPower(test_power, test_totalCrankRev, millis());
-        printfLog("Fake: Force=%d  Cad=%d\n", test_power, test_totalCrankRev);
-      }
-      else
-      {
-        if (show_values) {
-            printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f)\n", avgForce, mps, power, Ztilt, Zroll);
-        }
-        blePublishPower(power, totalCrankRevs, millis());
-      }
-    }
-    // If the pedals are moving, check if we missed too many measurement positions
-    else if ((avgRad >= STAND_STILL_RPS) && ((millis() - lastMeasurement) >= 8000)) {
-      // Reset timer for just this error message (not for a new measurement position)
-      lastMeasurement = millis() - MAX_CRANK_MEASUREMENT_WINDOW;
-
-      // Report ERROR situation
-      printfLog("ERROR: Pedaling but no measurement position detected within 8 seconds. Try to increase CRANK_POSITION_WINDOW (hard-coded).\n");
-
-      printfLog("%.1fN, %.1frad/s, Z=%0.0f/%0.0f\n", getAvgForce(), getZrot(), Ztilt, Zroll);
+    // We are not pedaling. Report this to the bluetooth host
+    blePublishPower(0, totalCrankRevs, millis()); // zero power, no cadence (resend same totalCrankRevs)
+    if (show_values) {
+        printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f, STOP)\n", getAvgForce(), CRANK_RADIUS * avgRad, 0, Ztilt, Zroll);
     }
 
-    // Print help text on bluetooth connection
-    printHelpOnConnect();
-
-    // Check the battery: don't need to do it nearly this often though.
-    // 1000 ms / sec * 60 sec / min * 5 = 5 minutes
-    if ((millis() - lastInfrequentUpdate) > (1000 * 60 * 5)) {
-      blePublishBatt();
-      lastInfrequentUpdate = millis();
-    }
-
-    // Check if we can go to sleep
-    gyroCheckSleepy(pedaling);
+    // Input for sleep timer
+    pedaling = false;
   }
+  // We are pedaling => Check if we reached the opposite position of the measuring position 
+  // for this we allow a large detection window, because precision doesn't matter here
+  else if ((Ztilt > 0-(CRANK_OPP_POSITION_WINDOW/2)) && (Ztilt < 0+(CRANK_OPP_POSITION_WINDOW/2)) && 
+            (Zroll > 90-(CRANK_OPP_POSITION_WINDOW/2)) && (Zroll < 90+(CRANK_OPP_POSITION_WINDOW/2))) {
+    oppositeOfMeasurementPositionReached = true;  
+  }
+  // We are pedaling => Check if we reached the measuring position. We apply a small detection window for highest precision 
+  else if (oppositeOfMeasurementPositionReached &&
+           (Ztilt > 0-(CRANK_POSITION_WINDOW/2)) && (Ztilt < 0+(CRANK_POSITION_WINDOW/2)) && 
+           (Zroll > -90-(CRANK_POSITION_WINDOW/2)) && (Zroll < -90+(CRANK_POSITION_WINDOW/2))) {  
+
+    // Reset the timer
+    lastMeasurement = millis();
+
+    // Wait for full rotation after this measurement
+    oppositeOfMeasurementPositionReached = false;  
+
+    // We are pedaling. Update the counter for the bluetooth host
+    pedaling = true;
+    totalCrankRevs++;
+
+    // Get the moving average force from the load cell (library)
+    avgForce = getAvgForce();
+
+    // Get the circular velocity of the rider's foot in m/s
+    float mps = CRANK_RADIUS * avgRad; 
+
+    // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
+    int16_t power = 2 * mps * avgForce;
+
+    if((test_power>0) || (test_totalCrankRev_inc>0))
+    {
+      test_totalCrankRev += test_totalCrankRev_inc;
+      blePublishPower(test_power, test_totalCrankRev, millis());
+      printfLog("Fake: Force=%d  Cad=%d\n", test_power, test_totalCrankRev);
+    }
+    else
+    {
+      if (show_values) {
+          printfLog("%.1fN, %.2fm/s, %dW, %0.0f/%0.0f, %d)\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs);
+      }
+      blePublishPower(power, totalCrankRevs, millis());
+    }
+  }
+  // If the pedals are moving, check if we missed too many measurement positions
+  else if ((avgRad >= STAND_STILL_RPS) && ((millis() - lastMeasurement) >= 8000)) {
+    // Reset timer 
+    lastMeasurement = millis();
+
+    // Report ERROR situation
+    printfLog("ERROR: Pedaling but no measurement position detected within 8 seconds. Try to increase CRANK_POSITION_WINDOW (hard-coded).\n");
+
+    printfLog("%.1fN, %.1frad/s, Z=%0.0f/%0.0f\n", getAvgForce(), getZrot(), Ztilt, Zroll);
+  }
+
+  // Print help text on bluetooth connection
+  printHelpOnConnect();
+
+  // Check the battery: don't need to do it nearly this often though.
+  // 1000 ms / sec * 60 sec / min * 5 = 5 minutes
+  if ((millis() - lastInfrequentUpdate) > (1000 * 60 * 5)) {
+    blePublishBatt();
+    lastInfrequentUpdate = millis();
+  }
+
+  // Check if we can go to sleep
+  gyroCheckSleepy(pedaling);
 
   // Read user input
   readUserInput();

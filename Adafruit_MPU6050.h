@@ -86,6 +86,16 @@ typedef enum clock_select {
   MPU6050_STOP = 7,
 } mpu6050_clock_select_t;
 
+typedef enum stdby_axis {
+  STBY_NONE = 0,
+  STBY_ZG = 1,
+  STBY_YG = 2,
+  STBY_XG = 4,
+  STBY_ZA = 8,
+  STBY_YA = 16,
+  STBY_XA = 32
+} mpu6050_stdby_axis_t;
+
 /**
  * @brief Accelerometer range options
  *
@@ -246,6 +256,8 @@ public:
   uint8_t getSampleRateDivisor(void);
 
   bool enableSleep(bool enable);
+  bool disableTemp(bool disable);
+  bool enableStandby(uint8_t stdby_axis);
   bool enableCycle(bool enable);
 
   void setCycleRate(mpu6050_cycle_rate_t rate);

@@ -490,6 +490,42 @@ bool Adafruit_MPU6050::enableSleep(bool enable) {
 
 /**************************************************************************/
 /*!
+*     @brief  Disables the temperature sensor
+*     @param  enable
+              If `true` the sensor is put into a low power state
+              and measurements are halted 
+      @returns True or false on successful write
+*/
+/**************************************************************************/
+bool Adafruit_MPU6050::disableTemp(bool disable) {
+  Adafruit_BusIO_Register pwr_mgmt =
+      Adafruit_BusIO_Register(i2c_dev, MPU6050_PWR_MGMT_1, 1);
+
+  Adafruit_BusIO_RegisterBits temp_dis =
+      Adafruit_BusIO_RegisterBits(&pwr_mgmt, 1, 3);
+  return temp_dis.write(disable);
+}
+
+/**************************************************************************/
+/*!
+*     @brief  Puts the specified axis in standby mode
+*     @param  enable
+              If the bit is high, the sensor is put into a low power state
+              and measurements are halted 
+      @returns True or false on successful write
+*/
+/**************************************************************************/
+bool Adafruit_MPU6050::enableStandby(uint8_t stdby_axis) {
+  Adafruit_BusIO_Register pwr_mgmt =
+      Adafruit_BusIO_Register(i2c_dev, MPU6050_PWR_MGMT_2, 1);
+
+  Adafruit_BusIO_RegisterBits stdby =
+      Adafruit_BusIO_RegisterBits(&pwr_mgmt, 6, 0);
+  return stdby.write(stdby_axis);
+}
+
+/**************************************************************************/
+/*!
 *     @brief  Controls sensor's 'Cycle' measurement mode
 *     @param  enable
               If `true` the sensor will take measurements at the rate

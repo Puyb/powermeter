@@ -139,8 +139,40 @@ void enterSleepMode() {
   // Power down loadcell
   LoadCell.powerDown();
 
+  // Put MPU6050 in low power
+  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_UNUSED);
+  mpu.setFilterBandwidth(MPU6050_BAND_260_HZ); ///< Docs imply this disables the filter
+
+ /*
+ *          |   ACCELEROMETER    |           GYROSCOPE
+ * DLPF_CFG | Bandwidth | Delay  | Bandwidth | Delay  | Sample Rate
+ * ---------+-----------+--------+-----------+--------+-------------
+ * 0        | 260Hz     | 0ms    | 256Hz     | 0.98ms | 8kHz
+ * 1        | 184Hz     | 2.0ms  | 188Hz     | 1.9ms  | 1kHz
+ * 2        | 94Hz      | 3.0ms  | 98Hz      | 2.8ms  | 1kHz
+ * 3        | 44Hz      | 4.9ms  | 42Hz      | 4.8ms  | 1kHz
+ * 4        | 21Hz      | 8.5ms  | 20Hz      | 8.3ms  | 1kHz
+ * 5        | 10Hz      | 13.8ms | 10Hz      | 13.4ms | 1kHz
+ * 6        | 5Hz       | 19.0ms | 5Hz       | 18.6ms | 1kHz
+ * 7 RESERVED
+ */
+
+  // Set sample rate = GYROSCOPE Sample Rate / (1 + SampleRateDivisor)
+  //                 = 8kHz/(1 + 999) = 8 Hz
+  mpu.setSampleRateDivisor(999);
+
+  // disabling non-used axis seems incompatible with the motion interrupt
+/*  
+  mpu.setClock(MPU6050_INTR_8MHz); // Keep clock running on internal clock 
+  mpu.setCycleRate(MPU6050_CYCLE_1_25_HZ); 
+  mpu.enableSleep(false);
+  mpu.enableCycle(true);
+  mpu.disableTemp(true);
+  mpu.enableStandby(STBY_XA + STBY_YA + STBY_XG + STBY_YG); // STBY_XA, STBY_YA, STBY_ZA, STBY_XG, STBY_YG, STBY_ZG
+*/
+
   // Set zero motion detection at gyro MPU6050
-  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
   mpu.setMotionDetectionThreshold(1);
   mpu.setMotionDetectionDuration(20);
   mpu.setInterruptPinLatch(false);  
@@ -165,40 +197,6 @@ float getZrot() {
   return abs(g.gyro.z); // should this be abs????
 }
 
-// TODO: Implement QUATERNION routines (for 360 degrees Ztilt instead of +90/-90) from here:
-//       https://github.com/jrowberg/i2cdevlib/blob/master/Arduino/MPU6050/examples/MPU6050_DMP6/MPU6050_DMP6.ino
-
-/*       -> Include gravity (in #else statement)
-
-#ifdef USE_OLD_DMPGETYAWPITCHROLL
-uint8_t MPU6050_6Axis_MotionApps20::dmpGetYawPitchRoll(float *data, Quaternion *q, VectorFloat *gravity) {
-    // yaw: (about Z axis)
-    data[0] = atan2(2*q -> x*q -> y - 2*q -> w*q -> z, 2*q -> w*q -> w + 2*q -> x*q -> x - 1);
-    // pitch: (nose up/down, about Y axis)
-    data[1] = atan(gravity -> x / sqrt(gravity -> y*gravity -> y + gravity -> z*gravity -> z));
-    // roll: (tilt left/right, about X axis)
-    data[2] = atan(gravity -> y / sqrt(gravity -> x*gravity -> x + gravity -> z*gravity -> z));
-    return 0;
-}
-#else 
-uint8_t MPU6050_6Axis_MotionApps20::dmpGetYawPitchRoll(float *data, Quaternion *q, VectorFloat *gravity) {
-    // yaw: (about Z axis)
-    data[0] = atan2(2*q -> x*q -> y - 2*q -> w*q -> z, 2*q -> w*q -> w + 2*q -> x*q -> x - 1);
-    // pitch: (nose up/down, about Y axis)
-    data[1] = atan2(gravity -> x , sqrt(gravity -> y*gravity -> y + gravity -> z*gravity -> z));
-    // roll: (tilt left/right, about X axis)
-    data[2] = atan2(gravity -> y , gravity -> z);
-    if (gravity -> z < 0) {
-        if(data[1] > 0) {
-            data[1] = PI - data[1]; 
-        } else { 
-            data[1] = -PI - data[1];
-        }
-    }
-    return 0;
-}
-#endif
-*/
 void getZtilt(float *roll, float *z) {
   /* Get new sensor events with the readings */
   sensors_event_t a, g, temp;
