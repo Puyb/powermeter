@@ -291,7 +291,7 @@ void blePublishBatt() {
 
   if (connection_count > 0) blebas.write(vbat_per);
 
-  printfLog("Battery level: %d%%  (voltage: %.3fV)\n\n", vbat_per, vbat_mv/1000.0);
+  printfLog("      Battery level: %d%%  (%.3fV)\n\n", vbat_per, vbat_mv/1000.0);
 }
 
 void connectCallback(uint16_t connHandle) {
@@ -361,7 +361,7 @@ void blePublishLog(char *msg, int numBytes) {
       bleuart.write(msg, bytesToDo);
       bytesToDo = 0;
     }
-    delay(20);
+    delay(40);
   }
 }
 

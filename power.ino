@@ -97,7 +97,17 @@ Adafruit_MPU6050 mpu;
 using namespace Adafruit_LittleFS_Namespace;
 File file(InternalFS);
 
+// Session stats
+static long lastSessionStart;
+static long lastSessionEnd = 0;
+static long lastSessionTotalCount = 0;
+static float lastSessionTotalPower = 0;
+static uint16_t totalCrankRevs = 0; // TODO it's possible this rolls over, about 12 hours at 90RPM for 16 bit unsigned.
 
+
+//
+// Setup
+//
 void setup() {
   Wire.begin();
 
@@ -107,6 +117,7 @@ void setup() {
 
   timeFirstSleepCheck=0;
   Sleepy = 0;
+  lastSessionStart = millis();
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
@@ -122,10 +133,10 @@ void setup() {
   delay(200);
 }
 
+//
+// Main loop
+//
 void loop() {
-  // Cadence is calculated by increasing total revolutions.
-  // TODO it's possible this rolls over, about 12 hours at 90RPM for 16 bit unsigned.
-  static uint16_t totalCrankRevs = 0;
   static bool oppositeOfMeasurementPositionReached = false;
 
   // Moving average of the velocity in rad/second
@@ -155,6 +166,9 @@ void loop() {
       ((millis() - lastStopMessage) >= 2000)) {
     // Reset timer
     lastStopMessage = millis();
+
+    // Only set end-time if we were cycling
+    if(lastSessionEnd == 0) lastSessionEnd = millis();
 
     // Reset timer to prevent false error message when we start pedaling again
     lastMeasurement = millis();
@@ -189,6 +203,9 @@ void loop() {
     pedaling = true;
     totalCrankRevs++;
 
+    // Reset end-time
+    lastSessionEnd=0;
+
     // Get the moving average force from the load cell (library)
     avgForce = getAvgForce();
 
@@ -207,9 +224,12 @@ void loop() {
     else
     {
       if (show_values) {
-          printfLog("%.1fN, %.2fm/s, %dW, %0.0f/%0.0f, %d)\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs);
+          printfLog("%.1fN, %.2fm/s, %dW, %0.0f/%0.0f, %d\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs);
       }
       blePublishPower(power, totalCrankRevs, millis());
+
+      lastSessionTotalPower += power;
+      lastSessionTotalCount++;
     }
   }
   // If the pedals are moving, check if we missed too many measurement positions
@@ -264,6 +284,19 @@ void printHelpOnConnect() {
   }
 }
 
+void lastSessionStats() {
+  float duration_min = (lastSessionEnd - lastSessionStart) / (1000.f * 60.f);
+  if ((duration_min > 0) && (lastSessionTotalCount > 0) && (totalCrankRevs > 0)) {
+    printfLog("Session stats (since last restart):\n");
+    printfLog("Duration: %.0f minutes\n", duration_min);
+    printfLog("   Power: %.1f W\n", lastSessionTotalPower / lastSessionTotalCount);
+    printfLog(" Cadence: %.1f rpm (incl. stops)\n\n", totalCrankRevs / duration_min);
+  }
+  else {
+    printfLog("No stats available yet.\n\n");
+  }
+}
+
 void printHelp() {
   printfLog("=================\n");
   printfLog("Power Cycle Meter\n");
@@ -272,12 +305,15 @@ void printHelp() {
   if (nvram_settings.load_offset == LOAD_OFFSET_DEFAULT) {
     printfLog("\nLoad-cell defaults loaded:\n");
   }
-  printfLog("Load offset calibration: %d\n",nvram_settings.load_offset);
-  printfLog("Load multiplier calibration: %.1f\n\n",nvram_settings.load_multiplier); 
-  blePublishBatt(); // Publish battery level to newly connected devices
+  printfLog("    Load offset cal: %d\n",nvram_settings.load_offset);
+  printfLog("Load multiplier cal: %.1f\n\n",nvram_settings.load_multiplier); 
+
+  printfLog("        Temperature: %.1f Celsius\n", getTemperature());
+  blePublishBatt(); // Broadcast and show battery level 
 
   printfLog("Commands:\n");
   printfLog(" h : show this Help text\n");
+  printfLog(" l : Show last session stats\n");
   printfLog(" m : Monitor power & cadence\n");
   printfLog(" f : Fake power & cadence\n");
   printfLog(" c : Calibrate load sensor\n");
@@ -294,6 +330,7 @@ void readUserInput() {
   if (buf[0] == 'c') calibrateLoadCell();
   if (buf[0] == 's') enterSleepMode();
   if (buf[0] == 'h') printHelp(); 
+  if (buf[0] == 'l') lastSessionStats(); 
   if (buf[0] == 'f') {
     if (test_power > 0) {
       test_power = 0;

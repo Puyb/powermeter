@@ -139,7 +139,7 @@ void enterSleepMode() {
   // Power down loadcell
   LoadCell.powerDown();
 
-  // Put MPU6050 in low power
+  // Put MPU6050 in low power (my guess, not measured)
   mpu.setGyroRange(MPU6050_RANGE_250_DEG);
   mpu.setHighPassFilter(MPU6050_HIGHPASS_UNUSED);
   mpu.setFilterBandwidth(MPU6050_BAND_260_HZ); ///< Docs imply this disables the filter
@@ -162,7 +162,7 @@ void enterSleepMode() {
   //                 = 8kHz/(1 + 999) = 8 Hz
   mpu.setSampleRateDivisor(999);
 
-  // disabling non-used axis seems incompatible with the motion interrupt
+  // Cycling-mode and/or disabling non-used axis seems incompatible with the motion interrupt
 /*  
   mpu.setClock(MPU6050_INTR_8MHz); // Keep clock running on internal clock 
   mpu.setCycleRate(MPU6050_CYCLE_1_25_HZ); 
@@ -172,14 +172,14 @@ void enterSleepMode() {
   mpu.enableStandby(STBY_XA + STBY_YA + STBY_XG + STBY_YG); // STBY_XA, STBY_YA, STBY_ZA, STBY_XG, STBY_YG, STBY_ZG
 */
 
-  // Set zero motion detection at gyro MPU6050
+  // Set zero motion detection interrupt at gyro MPU6050
   mpu.setMotionDetectionThreshold(1);
   mpu.setMotionDetectionDuration(20);
   mpu.setInterruptPinLatch(false);  
   mpu.setInterruptPinPolarity(false); // active high
   mpu.setMotionInterrupt(true);
 
-  // Enable wake-up by motion interrupt
+  // Enable wake-up by motion interrupt and power-down the Arduino board
   pinMode(GYRO_INT_PIN, INPUT_PULLUP);
   nrf_gpio_cfg_input(2,NRF_GPIO_PIN_NOPULL); 
   nrf_gpio_cfg_sense_input(2, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
@@ -208,5 +208,13 @@ void getZtilt(float *roll, float *z) {
   double z_Buff = float(a.acceleration.z);
   *roll = atan2(y_Buff , z_Buff) * 57.3;
   *z = atan2((- x_Buff) , sqrt(y_Buff * y_Buff + z_Buff * z_Buff)) * 57.3;
+}
+
+float getTemperature() {
+  /* Get new sensor events with the readings */
+  sensors_event_t a, g, temp;
+
+  mpu.getEvent(&a, &g, &temp);
+  return(temp.temperature);
 }
 
