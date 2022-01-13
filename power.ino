@@ -79,6 +79,19 @@ typedef struct settings_struct {
 } nvram_settings_struct;
 nvram_settings_struct nvram_settings;
 
+// Max. 2 hours of data @ 70 rpm
+#define LASTSESSIONDATAINDEX_MAX 70*60*2
+
+typedef struct lastSession_struct {
+  uint16_t totalCrankRevs;
+  long millis;
+  uint16_t power;
+  uint16_t avgRad;
+  uint16_t avgForce;
+} lastSessionData_struct;
+lastSessionData_struct lastSessionData[LASTSESSIONDATAINDEX_MAX]; 
+long lastSessionDataIndex=0;
+
 //HX711 pins:
 #define HX711_dout A0 //mcu > HX711 dout pin (was: 4)
 #define HX711_sck A1 //mcu > HX711 sck pin (was: 5)
@@ -231,6 +244,16 @@ void loop() {
       lastSessionTotalPower += power;
       lastSessionTotalCount++;
     }
+
+    // Store session data
+    if (lastSessionDataIndex < LASTSESSIONDATAINDEX_MAX) {
+      lastSessionData[lastSessionDataIndex].totalCrankRevs = totalCrankRevs;
+      lastSessionData[lastSessionDataIndex].millis = millis();
+      lastSessionData[lastSessionDataIndex].power = (uint16_t) power;
+      lastSessionData[lastSessionDataIndex].avgRad = (uint16_t) ((30*avgRad/PI)+0.5); // 30*avgRad/PI is the average cadence in RPM
+      lastSessionData[lastSessionDataIndex].avgForce = (uint16_t) (avgForce+0.5);
+      lastSessionDataIndex++;
+    }
   }
   // If the pedals are moving, check if we missed too many measurement positions
   else if ((avgRad >= STAND_STILL_RPS) && ((millis() - lastMeasurement) >= 8000)) {
@@ -284,7 +307,7 @@ void printHelpOnConnect() {
   }
 }
 
-void lastSessionStats() {
+void printLastSessionStats() {
   float duration_min = (lastSessionEnd - lastSessionStart) / (1000.f * 60.f);
   if ((duration_min > 0) && (lastSessionTotalCount > 0) && (totalCrankRevs > 0)) {
     printfLog("Session stats (since last restart):\n");
@@ -294,6 +317,24 @@ void lastSessionStats() {
   }
   else {
     printfLog("No stats available yet.\n\n");
+  }
+}
+
+void printLastSessionData() {
+  float duration_min = (lastSessionEnd - lastSessionStart) / (1000.f * 60.f);
+  if ((duration_min > 0) && (lastSessionTotalCount > 0) && (totalCrankRevs > 0)) {
+    printfLog("totalCrankRevs, millis [ms], power [W], cadence [rpm], avgForce [N]\n");
+    for (long i = 0; i < lastSessionDataIndex; i++) {
+      printfLog("%d, %d, %d, %d, %d\n", 
+        lastSessionData[i].totalCrankRevs,
+        lastSessionData[i].millis,
+        lastSessionData[i].power,
+        lastSessionData[i].avgRad,
+        lastSessionData[i].avgForce);
+    }
+  }
+  else {
+    printfLog("No data available yet.\n\n");
   }
 }
 
@@ -313,7 +354,8 @@ void printHelp() {
 
   printfLog("Commands:\n");
   printfLog(" h : show this Help text\n");
-  printfLog(" l : Show last session stats\n");
+  printfLog(" l : show Last session stats\n");
+  printfLog(" d : show Last session Data\n");
   printfLog(" m : Monitor power & cadence\n");
   printfLog(" f : Fake power & cadence\n");
   printfLog(" c : Calibrate load sensor\n");
@@ -330,7 +372,8 @@ void readUserInput() {
   if (buf[0] == 'c') calibrateLoadCell();
   if (buf[0] == 's') enterSleepMode();
   if (buf[0] == 'h') printHelp(); 
-  if (buf[0] == 'l') lastSessionStats(); 
+  if (buf[0] == 'l') printLastSessionStats(); 
+  if (buf[0] == 'd') printLastSessionData(); 
   if (buf[0] == 'f') {
     if (test_power > 0) {
       test_power = 0;
