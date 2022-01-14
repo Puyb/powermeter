@@ -139,10 +139,16 @@ void enterSleepMode() {
   // Power down loadcell
   LoadCell.powerDown();
 
-  // Put MPU6050 in low power (my guess, not measured)
+  // Put MPU6050 in low power (wild guess, to be measured)
+/*
   mpu.setGyroRange(MPU6050_RANGE_250_DEG);
   mpu.setHighPassFilter(MPU6050_HIGHPASS_UNUSED);
   mpu.setFilterBandwidth(MPU6050_BAND_260_HZ); ///< Docs imply this disables the filter
+
+  // Set sample rate = GYROSCOPE Sample Rate / (1 + SampleRateDivisor)
+  //                 = 8kHz/(1 + 999) = 8 Hz
+  mpu.setSampleRateDivisor(999);
+*/
 
  /*
  *          |   ACCELEROMETER    |           GYROSCOPE
@@ -158,9 +164,6 @@ void enterSleepMode() {
  * 7 RESERVED
  */
 
-  // Set sample rate = GYROSCOPE Sample Rate / (1 + SampleRateDivisor)
-  //                 = 8kHz/(1 + 999) = 8 Hz
-  mpu.setSampleRateDivisor(999);
 
   // Cycling-mode and/or disabling non-used axis seems incompatible with the motion interrupt
 /*  

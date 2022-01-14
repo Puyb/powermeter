@@ -43,6 +43,12 @@
 // for this we allow a 90 degrees (+/-45) detection window, because precision doesn't matter here
 #define CRANK_OPP_POSITION_WINDOW 90
 
+// The minimum time between two measurements in milliseconds
+// to prevent spikes in the avgForce calculation 
+// The HX711 rate is 10 Hz, and the HX711 library smoothens the data over the last 32 samples = 3.2 seconds 
+// and we assume that this 3.2 seconds is the slowest cycle possible (for which we still want all measurements)
+#define CRANK_MINIMUM_ROTATION_TIME 1000
+
 // If the number of radians per seconds is less than this, we assume the user stopped pedaling
 #define STAND_STILL_RPS (0.25 * PI)
 
@@ -201,59 +207,64 @@ void loop() {
             (Zroll > 90-(CRANK_OPP_POSITION_WINDOW/2)) && (Zroll < 90+(CRANK_OPP_POSITION_WINDOW/2))) {
     oppositeOfMeasurementPositionReached = true;  
   }
-  // We are pedaling => Check if we reached the measuring position. We apply a small detection window for highest precision 
+  // We are pedaling => Check if we made a full cycle yet, if we reached the minimum rotation-time and
+  // if we reached the measuring position. We apply a small detection window for highest precision 
   else if (oppositeOfMeasurementPositionReached &&
            (Ztilt > 0-(CRANK_POSITION_WINDOW/2)) && (Ztilt < 0+(CRANK_POSITION_WINDOW/2)) && 
            (Zroll > -90-(CRANK_POSITION_WINDOW/2)) && (Zroll < -90+(CRANK_POSITION_WINDOW/2))) {  
 
-    // Wait for full rotation after this measurement
+    // Wait for the next full rotation
     oppositeOfMeasurementPositionReached = false;  
 
     // We are pedaling. Update the counter for the bluetooth host
     pedaling = true;
     totalCrankRevs++;
 
-    // Reset end-time
-    lastSessionEnd=0;
-
-    // Get the moving average force from the load cell (library)
-    avgForce = getAvgForce();
-
-    // Get the circular velocity of the rider's foot in m/s
-    float mps = CRANK_RADIUS * avgRad; 
-
-    // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
-    int16_t power = 2 * mps * avgForce;
-
-    if((test_power>0) || (test_totalCrankRev_inc>0))
+    // While we always count the crank revolutions, we only measure the average the force if we have sufficient measurements
+    if ((millis() - lastMeasurement) >= CRANK_MINIMUM_ROTATION_TIME)
     {
-      test_totalCrankRev += test_totalCrankRev_inc;
-      blePublishPower(test_power, test_totalCrankRev, millis());
-      printfLog("Fake: Force=%d  Cad=%d\n", test_power, test_totalCrankRev);
-    }
-    else
-    {
-      if (show_values) {
-          printfLog("%.1fN, %.2fm/s, %dW, %0.0f/%0.0f, %d\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs);
+      // Reset end-time
+      lastSessionEnd=0;
+
+      // Get the moving average force from the load cell (library)
+      avgForce = getAvgForce();
+
+      // Get the circular velocity of the rider's foot in m/s
+      float mps = CRANK_RADIUS * avgRad; 
+
+      // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
+      int16_t power = 2 * mps * avgForce;
+
+      if((test_power>0) || (test_totalCrankRev_inc>0))
+      {
+        test_totalCrankRev += test_totalCrankRev_inc;
+        blePublishPower(test_power, test_totalCrankRev, millis());
+        printfLog("Fake: Force=%d  Cad=%d\n", test_power, test_totalCrankRev);
       }
-      blePublishPower(power, totalCrankRevs, millis());
+      else
+      {
+        if (show_values) {
+            printfLog("%.1fN, %.2fm/s, %dW, %0.0f/%0.0f, %d\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs);
+        }
+        blePublishPower(power, totalCrankRevs, millis());
 
-      lastSessionTotalPower += power;
-      lastSessionTotalCount++;
+        lastSessionTotalPower += power;
+        lastSessionTotalCount++;
+      }
+
+      // Store session data
+      if (lastSessionDataIndex < LASTSESSIONDATAINDEX_MAX) {
+        lastSessionData[lastSessionDataIndex].totalCrankRevs = totalCrankRevs;
+        lastSessionData[lastSessionDataIndex].millis = millis()-lastMeasurement;
+        lastSessionData[lastSessionDataIndex].power = (uint16_t) power;
+        lastSessionData[lastSessionDataIndex].avgRad = (uint16_t) ((30*avgRad/PI)+0.5); // 30*avgRad/PI is the average cadence in RPM
+        lastSessionData[lastSessionDataIndex].avgForce = (uint16_t) (avgForce+0.5);
+        lastSessionDataIndex++;
+      }
+
+      // Reset the timer
+      lastMeasurement = millis();
     }
-
-    // Store session data
-    if (lastSessionDataIndex < LASTSESSIONDATAINDEX_MAX) {
-      lastSessionData[lastSessionDataIndex].totalCrankRevs = totalCrankRevs;
-      lastSessionData[lastSessionDataIndex].millis = millis()-lastMeasurement;
-      lastSessionData[lastSessionDataIndex].power = (uint16_t) power;
-      lastSessionData[lastSessionDataIndex].avgRad = (uint16_t) ((30*avgRad/PI)+0.5); // 30*avgRad/PI is the average cadence in RPM
-      lastSessionData[lastSessionDataIndex].avgForce = (uint16_t) (avgForce+0.5);
-      lastSessionDataIndex++;
-    }
-
-    // Reset the timer
-    lastMeasurement = millis();
   }
   // If the pedals are moving, check if we missed too many measurement positions
   else if ((avgRad >= STAND_STILL_RPS) && ((millis() - lastMeasurement) >= 8000)) {
