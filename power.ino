@@ -206,9 +206,6 @@ void loop() {
            (Ztilt > 0-(CRANK_POSITION_WINDOW/2)) && (Ztilt < 0+(CRANK_POSITION_WINDOW/2)) && 
            (Zroll > -90-(CRANK_POSITION_WINDOW/2)) && (Zroll < -90+(CRANK_POSITION_WINDOW/2))) {  
 
-    // Reset the timer
-    lastMeasurement = millis();
-
     // Wait for full rotation after this measurement
     oppositeOfMeasurementPositionReached = false;  
 
@@ -248,12 +245,15 @@ void loop() {
     // Store session data
     if (lastSessionDataIndex < LASTSESSIONDATAINDEX_MAX) {
       lastSessionData[lastSessionDataIndex].totalCrankRevs = totalCrankRevs;
-      lastSessionData[lastSessionDataIndex].millis = millis();
+      lastSessionData[lastSessionDataIndex].millis = millis()-lastMeasurement;
       lastSessionData[lastSessionDataIndex].power = (uint16_t) power;
       lastSessionData[lastSessionDataIndex].avgRad = (uint16_t) ((30*avgRad/PI)+0.5); // 30*avgRad/PI is the average cadence in RPM
       lastSessionData[lastSessionDataIndex].avgForce = (uint16_t) (avgForce+0.5);
       lastSessionDataIndex++;
     }
+
+    // Reset the timer
+    lastMeasurement = millis();
   }
   // If the pedals are moving, check if we missed too many measurement positions
   else if ((avgRad >= STAND_STILL_RPS) && ((millis() - lastMeasurement) >= 8000)) {
@@ -323,7 +323,7 @@ void printLastSessionStats() {
 void printLastSessionData() {
   float duration_min = (lastSessionEnd - lastSessionStart) / (1000.f * 60.f);
   if ((duration_min > 0) && (lastSessionTotalCount > 0) && (totalCrankRevs > 0)) {
-    printfLog("totalCrankRevs, millis [ms], power [W], cadence [rpm], avgForce [N]\n");
+    printfLog("totalCrankRevs, measTime [ms], power [W], cadence [rpm], avgForce [N]\n");
     for (long i = 0; i < lastSessionDataIndex; i++) {
       printfLog("%d, %d, %d, %d, %d\n", 
         lastSessionData[i].totalCrankRevs,
@@ -355,7 +355,7 @@ void printHelp() {
   printfLog("Commands:\n");
   printfLog(" h : show this Help text\n");
   printfLog(" l : show Last session stats\n");
-  printfLog(" d : show Last session Data\n");
+  printfLog(" d : show last session Data (csv)\n");
   printfLog(" m : Monitor power & cadence\n");
   printfLog(" f : Fake power & cadence\n");
   printfLog(" c : Calibrate load sensor\n");
