@@ -140,7 +140,6 @@ void enterSleepMode() {
   LoadCell.powerDown();
 
   // Put MPU6050 in low power (wild guess, to be measured)
-/*
   mpu.setGyroRange(MPU6050_RANGE_250_DEG);
   mpu.setHighPassFilter(MPU6050_HIGHPASS_UNUSED);
   mpu.setFilterBandwidth(MPU6050_BAND_260_HZ); ///< Docs imply this disables the filter
@@ -148,7 +147,7 @@ void enterSleepMode() {
   // Set sample rate = GYROSCOPE Sample Rate / (1 + SampleRateDivisor)
   //                 = 8kHz/(1 + 999) = 8 Hz
   mpu.setSampleRateDivisor(999);
-*/
+
 
  /*
  *          |   ACCELEROMETER    |           GYROSCOPE
@@ -176,6 +175,7 @@ void enterSleepMode() {
 */
 
   // Set zero motion detection interrupt at gyro MPU6050
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
   mpu.setMotionDetectionThreshold(1);
   mpu.setMotionDetectionDuration(20);
   mpu.setInterruptPinLatch(false);  
