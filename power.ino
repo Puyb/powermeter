@@ -35,13 +35,8 @@
 // HX711 on-board hardware switch default is 10 Hz (alternative: 80 Hz)
 #define HX711_RATE 10 
 
-// The window in which the crank position (tilt and roll) is assumed to be located in the 'measuring position'
-// (crank with measurement device horizontal to the front) in rotational degrees
-#define CRANK_POSITION_WINDOW 10
-
-// To check if we reached the opposite position of the measuring position 
-// for this we allow a 90 degrees (+/-45) detection window, because precision doesn't matter here
-#define CRANK_OPP_POSITION_WINDOW 90
+// Interval for publishing the cadence and power to bluetooth when not pedaling
+#define STOPPED_BLE_UPDATE_INTERVAL 2000
 
 // The minimum time between two measurements in milliseconds
 // to prevent spikes in the avgForce calculation 
@@ -121,8 +116,11 @@ static long lastSessionStart;
 static long lastSessionEnd = 0;
 static long lastSessionTotalCount = 0;
 static float lastSessionTotalPower = 0;
-static uint16_t totalCrankRevs = 0; // TODO it's possible this rolls over, about 12 hours at 90RPM for 16 bit unsigned.
 
+// Last measured/calculated values 
+static float totalCrankRevs = 0; 
+static float mps = 0;
+static int16_t power = 0;
 
 //
 // Setup
@@ -156,139 +154,131 @@ void setup() {
 // Main loop
 //
 void loop() {
-  static bool oppositeOfMeasurementPositionReached = false;
 
-  // Moving average of the velocity in rad/second
-  float avgRad = 0;
-
-  // Vars for force
-  static float avgForce = 0.f;
-
-  // We only publish every once-in-a-while.
+  static float avgRad;
+  static float avgForce;
+  static float Zroll, Ztilt; 
+  static bool halfWayReached = false;
+  static bool pedaling = false;
+ 
+  // Initialize timers
   static long lastMeasurement = millis();
   static long lastStopMessage = millis();
+  static long lastBatteryUpdate = millis();
+  static long lastBluetoothUpdate = millis();
 
-  // Other things (like battery) might be on a longer update schedule for power.
-  static long lastInfrequentUpdate = millis();
-
-  bool pedaling = false;
-  float Zroll, Ztilt; 
 
   // Get moving average velocity in rad per second
   avgRad = MA_cadence(getZrot());
 
   // Get the crank Z position
   getZtilt(&Zroll, &Ztilt);
-  
-  // Check if we stopped pedaling every 2000 ms
-  if ((avgRad < STAND_STILL_RPS) &&
-      ((millis() - lastStopMessage) >= 2000)) {
-    // Reset timer
-    lastStopMessage = millis();
 
-    // Only set end-time if we were cycling
-    if(lastSessionEnd == 0) lastSessionEnd = millis();
+  // Check if we stopped pedaling
+  if (avgRad <= STAND_STILL_RPS) {
+    pedaling = false;
 
-    // Reset timer to prevent false error message when we start pedaling again
+    // Reset last-measurement time: we only want to average the applied force over actual pedaled time
     lastMeasurement = millis();
 
-    // We are not pedaling. Report this to the bluetooth host
-    blePublishPower(0, totalCrankRevs, millis()); // zero power, no cadence (resend same totalCrankRevs)
-    if (show_values) {
-        printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f, STOP)\n", getAvgForce(), CRANK_RADIUS * avgRad, 0, Ztilt, Zroll);
+    if ((millis() - lastStopMessage) >= STOPPED_BLE_UPDATE_INTERVAL) {
+      // Reset timers
+      lastStopMessage = millis();
+
+      if((test_power>0) || (test_totalCrankRev_inc>0))
+      {
+        // We are faking a measurement
+        test_totalCrankRev += test_totalCrankRev_inc;
+        printfLog("Fake: Force=%d  Crank revs=%d\n", test_power, test_totalCrankRev);
+        blePublishPower(test_power, test_totalCrankRev, millis());
+      }
+      else
+      {
+        // We are not pedaling. Report this to the bluetooth host
+        blePublishPower(0, (long)totalCrankRevs+0.5, millis()); // zero power, no cadence (resend same totalCrankRevs)
+        if (show_values) {
+            printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f, STOP)\n", getAvgForce(), CRANK_RADIUS * avgRad, 0, Ztilt, Zroll);
+        }
+      }
     }
-
-    // Input for sleep timer
-    pedaling = false;
   }
-  // We are pedaling => Check if we reached the opposite position of the measuring position 
-  // for this we allow a large detection window, because precision doesn't matter here
-  else if ((Ztilt > 0-(CRANK_OPP_POSITION_WINDOW/2)) && (Ztilt < 0+(CRANK_OPP_POSITION_WINDOW/2)) && 
-            (Zroll > 90-(CRANK_OPP_POSITION_WINDOW/2)) && (Zroll < 90+(CRANK_OPP_POSITION_WINDOW/2))) {
-    oppositeOfMeasurementPositionReached = true;  
-  }
-  // We are pedaling => Check if we made a full cycle yet, if we reached the minimum rotation-time and
-  // if we reached the measuring position. We apply a small detection window for highest precision 
-  else if (oppositeOfMeasurementPositionReached &&
-           (Ztilt > 0-(CRANK_POSITION_WINDOW/2)) && (Ztilt < 0+(CRANK_POSITION_WINDOW/2)) && 
-           (Zroll > -90-(CRANK_POSITION_WINDOW/2)) && (Zroll < -90+(CRANK_POSITION_WINDOW/2))) {  
-
-    // Wait for the next full rotation
-    oppositeOfMeasurementPositionReached = false;  
-
-    // We are pedaling. Update the counter for the bluetooth host
+  else // We are pedaling (not standing still)
+  {
     pedaling = true;
-    totalCrankRevs++;
 
-    // While we always count the crank revolutions, we only measure the average the force if we have sufficient measurements
-    if ((millis() - lastMeasurement) >= CRANK_MINIMUM_ROTATION_TIME)
-    {
-      // Reset end-time
-      lastSessionEnd=0;
+    //
+    // POWER MEASUREMENT
+    //
+
+    // Check if we reached the halfway point (crank pointing backward (Zroll>0)
+    if (Zroll>0) {
+      halfWayReached = true;
+    }
+    // Check if we reached the measuring position (crank pointing forward (Zroll<0) and as horizontal as possible (Ztilt~0))
+    // We only calculate power if we have sufficient force-measurements (HX711 measures at 10 Hz)
+    else if (halfWayReached && (Zroll<0) && (Ztilt<0) && ((millis() - lastMeasurement) >= CRANK_MINIMUM_ROTATION_TIME)) {  
+      halfWayReached = false;
 
       // Get the moving average force from the load cell (library)
       avgForce = getAvgForce();
 
       // Get the circular velocity of the rider's foot in m/s
-      float mps = CRANK_RADIUS * avgRad; 
+      mps = CRANK_RADIUS * avgRad; 
 
       // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
-      int16_t power = 2 * mps * avgForce;
+      power = 2 * mps * avgForce;
 
-      if((test_power>0) || (test_totalCrankRev_inc>0))
-      {
-        test_totalCrankRev += test_totalCrankRev_inc;
-        blePublishPower(test_power, test_totalCrankRev, millis());
-        printfLog("Fake: Force=%d  Cad=%d\n", test_power, test_totalCrankRev);
-      }
-      else
-      {
-        if (show_values) {
-            printfLog("%.1fN, %.2fm/s, %dW, %0.0f/%0.0f, %d\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs);
-        }
-        blePublishPower(power, totalCrankRevs, millis());
+      // Reset the timer
+      lastMeasurement = millis();
+    }
 
-        lastSessionTotalPower += power;
-        lastSessionTotalCount++;
+    //
+    // Publish updated cadence and latest power measurement to the bluetooth host after each crank-rotation
+    //
+
+    // Estimate crank revolutions since last bluetooth-update from the last gyroscope crank-speed measurements (avgRad)
+    float crankRevAdd = ((millis() - lastBluetoothUpdate)/1000.f) * (avgRad / (2 * PI));
+
+    // Publish measurements after each crank-rotation
+    if (crankRevAdd >= 1.0) {
+      totalCrankRevs = totalCrankRevs + crankRevAdd;
+      blePublishPower(power, (long)totalCrankRevs, millis());
+
+      if (show_values) {
+          printfLog("%.1fN, %.2fm/s, %dW, %0.0f/%0.0f, %0.0f\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs);
       }
+
+      // Update last session stats
+      lastSessionTotalPower += power;
+      lastSessionTotalCount++;
+      lastSessionEnd = millis();
 
       // Store session data
       if (lastSessionDataIndex < LASTSESSIONDATAINDEX_MAX) {
-        lastSessionData[lastSessionDataIndex].totalCrankRevs = totalCrankRevs;
-        lastSessionData[lastSessionDataIndex].millis = millis()-lastMeasurement;
+        lastSessionData[lastSessionDataIndex].totalCrankRevs = (long)totalCrankRevs+0.5;
+        lastSessionData[lastSessionDataIndex].millis = millis()-lastBluetoothUpdate;
         lastSessionData[lastSessionDataIndex].power = (uint16_t) power;
         lastSessionData[lastSessionDataIndex].avgRad = (uint16_t) ((30*avgRad/PI)+0.5); // 30*avgRad/PI is the average cadence in RPM
         lastSessionData[lastSessionDataIndex].avgForce = (uint16_t) (avgForce+0.5);
         lastSessionDataIndex++;
       }
 
-      // Reset the timer
-      lastMeasurement = millis();
+      // Reset timer
+      lastBluetoothUpdate = millis();
     }
-  }
-  // If the pedals are moving, check if we missed too many measurement positions
-  else if ((avgRad >= STAND_STILL_RPS) && ((millis() - lastMeasurement) >= 8000)) {
-    // Reset timer 
-    lastMeasurement = millis();
-
-    // Report ERROR situation
-    printfLog("ERROR: Pedaling but no measurement position detected within 8 seconds. Try to increase CRANK_POSITION_WINDOW (hard-coded).\n");
-
-    printfLog("%.1fN, %.1frad/s, Z=%0.0f/%0.0f\n", getAvgForce(), getZrot(), Ztilt, Zroll);
   }
 
   // Print help text on bluetooth connection
   printHelpOnConnect();
 
-  // Check the battery: don't need to do it nearly this often though.
-  // 1000 ms / sec * 60 sec / min * 5 = 5 minutes
-  if ((millis() - lastInfrequentUpdate) > (1000 * 60 * 5)) {
-    blePublishBatt();
-    lastInfrequentUpdate = millis();
-  }
-
   // Check if we can go to sleep
   gyroCheckSleepy(pedaling);
+
+  // Publish battery-level over bluetooth  
+  if ((millis() - lastBatteryUpdate) > (1000 * 60 * 5)) {
+    blePublishBatt();
+    lastBatteryUpdate = millis();
+  }
 
   // Read user input
   readUserInput();
@@ -334,7 +324,7 @@ void printLastSessionStats() {
 void printLastSessionData() {
   float duration_min = (lastSessionEnd - lastSessionStart) / (1000.f * 60.f);
   if ((duration_min > 0) && (lastSessionTotalCount > 0) && (totalCrankRevs > 0)) {
-    printfLog("totalCrankRevs, measTime [ms], power [W], cadence [rpm], avgForce [N]\n");
+    printfLog("crankRevs, crankRotation [ms], power [W], cadence [rpm], force [N]\n");
     for (long i = 0; i < lastSessionDataIndex; i++) {
       printfLog("%d, %d, %d, %d, %d\n", 
         lastSessionData[i].totalCrankRevs,
@@ -425,7 +415,7 @@ float MA_cadence(float value) {
     current = 0;
 
   if (cvalues < nvalues)
-    cvalues += 1;
+    cvalues++;
 
   return sum/cvalues;
 }
