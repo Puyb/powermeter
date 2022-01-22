@@ -87,7 +87,7 @@ typedef struct lastSession_struct {
   uint16_t totalCrankRevs;
   long millis;
   uint16_t power;
-  uint16_t avgRad;
+  uint16_t cadence;
   uint16_t avgForce;
 } lastSessionData_struct;
 lastSessionData_struct lastSessionData[LASTSESSIONDATAINDEX_MAX]; 
@@ -120,6 +120,7 @@ static float lastSessionTotalPower = 0;
 // Last measured/calculated values 
 static float totalCrankRevs = 0; 
 static float mps = 0;
+static float avgForce = 0;
 static int16_t power = 0;
 
 //
@@ -156,7 +157,6 @@ void setup() {
 void loop() {
 
   static float avgRad;
-  static float avgForce;
   static float Zroll, Ztilt; 
   static bool halfWayReached = false;
   static bool pedaling = false;
@@ -242,7 +242,7 @@ void loop() {
     // Publish measurements after each crank-rotation
     if (crankRevAdd >= 1.0) {
       totalCrankRevs = totalCrankRevs + crankRevAdd;
-      blePublishPower(power, (long)totalCrankRevs, millis());
+      blePublishPower(power, (long)totalCrankRevs+0.5, millis());
 
       if (show_values) {
           printfLog("%.1fN, %.2fm/s, %dW, %0.0f/%0.0f, %0.0f\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs);
@@ -258,7 +258,7 @@ void loop() {
         lastSessionData[lastSessionDataIndex].totalCrankRevs = (long)totalCrankRevs+0.5;
         lastSessionData[lastSessionDataIndex].millis = millis()-lastBluetoothUpdate;
         lastSessionData[lastSessionDataIndex].power = (uint16_t) power;
-        lastSessionData[lastSessionDataIndex].avgRad = (uint16_t) ((30*avgRad/PI)+0.5); // 30*avgRad/PI is the average cadence in RPM
+        lastSessionData[lastSessionDataIndex].cadence = (uint16_t) ((30*avgRad/PI)+0.5); // 30*avgRad/PI is the average cadence in RPM
         lastSessionData[lastSessionDataIndex].avgForce = (uint16_t) (avgForce+0.5);
         lastSessionDataIndex++;
       }
@@ -330,7 +330,7 @@ void printLastSessionData() {
         lastSessionData[i].totalCrankRevs,
         lastSessionData[i].millis,
         lastSessionData[i].power,
-        lastSessionData[i].avgRad,
+        lastSessionData[i].cadence,
         lastSessionData[i].avgForce);
     }
   }
