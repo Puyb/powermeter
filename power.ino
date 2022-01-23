@@ -56,7 +56,8 @@
 volatile long timeFirstSleepCheck=0;
 volatile long Sleepy=0;
 volatile long connectedStart=0;
-volatile boolean newLoadDataReady=0;
+volatile uint8_t newLoadDataReady=0;
+volatile uint8_t newZrotDataReady=0;
 volatile uint8_t connection_count = 0; // bluetooth connection count
 volatile int last_connection_count=0; // for automatically printing the help text
 
@@ -197,7 +198,7 @@ void loop() {
         // We are not pedaling. Report this to the bluetooth host
         blePublishPower(0, (long)totalCrankRevs+0.5, millis()); // zero power, no cadence (resend same totalCrankRevs)
         if (show_values) {
-            printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f, STOP)\n", getAvgForce(), CRANK_RADIUS * avgRad, 0, Ztilt, Zroll);
+            printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f, STOP)\n", MA_force(getAvgForce()), CRANK_RADIUS * avgRad, 0, Ztilt, Zroll);
         }
       }
     }
@@ -220,13 +221,22 @@ void loop() {
       halfWayReached = false;
 
       // Get the moving average force from the load cell (library)
-      avgForce = getAvgForce();
+      uint8_t newLoadDataReady_tmp = newLoadDataReady;
+      avgForce = MA_force(getAvgForce()); 
 
       // Get the circular velocity of the rider's foot in m/s
-      mps = CRANK_RADIUS * avgRad; 
+      mps = CRANK_RADIUS * avgRad; // (2*PI*r) * avgRad/(2*PI) = r * avgRad
 
       // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
       power = 2 * mps * avgForce;
+
+      // Show the values (to check if the Ztilt is close to 0 when measuring)
+      if (show_values) {
+          printfLog("%.0fN, %.2fm/s, %dW, %0.0f/%0.0f, %0.0f, %d/%d\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs, newLoadDataReady_tmp, newZrotDataReady);
+      }
+
+      // Reset Zrot measurement counter
+      newZrotDataReady = 0;
 
       // Reset the timer
       lastMeasurement = millis();
@@ -243,10 +253,6 @@ void loop() {
     if (crankRevAdd >= 1.0) {
       totalCrankRevs = totalCrankRevs + crankRevAdd;
       blePublishPower(power, (long)totalCrankRevs+0.5, millis());
-
-      if (show_values) {
-          printfLog("%.1fN, %.2fm/s, %dW, %0.0f/%0.0f, %0.0f\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs);
-      }
 
       // Update last session stats
       lastSessionTotalPower += power;
@@ -274,7 +280,7 @@ void loop() {
   // Check if we can go to sleep
   gyroCheckSleepy(pedaling);
 
-  // Publish battery-level over bluetooth  
+  // Publish battery-level over bluetooth every 5 minutes
   if ((millis() - lastBatteryUpdate) > (1000 * 60 * 5)) {
     blePublishBatt();
     lastBatteryUpdate = millis();
@@ -390,16 +396,42 @@ void readUserInput() {
       show_values = false;
     }
     else {
+      printfLog("avgForce, mps, power, Ztilt/Zroll,totalCrankRevs, #LoadData/#ZrotData\n");
       show_values = true;
     }
   }
 }
 
 float MA_cadence(float value) {
-  const byte nvalues = 64;            // Arbitrary number for the moving average window size
+  const int nvalues = 256;            // At least the maximum number of values (#ZrotData) per crank-rotation 
 
-  static byte current = 0;            // Index for current value
-  static byte cvalues = 0;            // Count of values read (<= nvalues)
+  static int current = 0;            // Index for current value
+  static int cvalues = 0;            // Count of values read (<= nvalues)
+  static float sum = 0;               // Rolling sum
+  static float values[nvalues];
+
+  sum += value;
+
+  // If the window is full, adjust the sum by deleting the oldest value
+  if (cvalues == nvalues)
+    sum -= values[current];
+
+  values[current] = value;          // Replace the oldest with the latest
+
+  if (++current >= nvalues)
+    current = 0;
+
+  if (cvalues < nvalues)
+    cvalues++;
+
+  return sum/cvalues;
+}
+
+float MA_force(float value) {
+  const int nvalues = 3;            // Average over the last 3 crank-rotations
+
+  static int current = 0;            // Index for current value
+  static int cvalues = 0;            // Count of values read (<= nvalues)
   static float sum = 0;               // Rolling sum
   static float values[nvalues];
 

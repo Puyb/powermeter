@@ -49,7 +49,7 @@ void loadSetup() {
 //interrupt routine:
 void dataReadyISR() {
   if (LoadCell.update()) {
-    newLoadDataReady = 1;
+    newLoadDataReady++;
   }
 }
 
@@ -61,8 +61,10 @@ float getAvgForce() {
   static float currentData = 0;
 
   if (newLoadDataReady) {
+      noInterrupts(); // disable interrupts
       currentData = abs(LoadCell.getData());
       newLoadDataReady = 0;
+      interrupts(); // enable interrupts
   }
 
   return (currentData);

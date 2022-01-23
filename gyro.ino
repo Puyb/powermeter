@@ -64,7 +64,7 @@ void gyroSetup() {
     break;
   }
 
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  mpu.setFilterBandwidth(MPU6050_BAND_260_HZ);
   Serial.print("Filter bandwidth set to: ");
   switch (mpu.getFilterBandwidth()) {
   case MPU6050_BAND_260_HZ:
@@ -89,6 +89,10 @@ void gyroSetup() {
     Serial.println("5 Hz");
     break;
   }
+
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_UNUSED);
+  mpu.setClock(MPU6050_INTR_8MHz); // Keep clock running on internal clock 
+
 
   Serial.println("");
   delay(100);
@@ -190,10 +194,17 @@ void enterSleepMode() {
 }
 
 float getZrot() {
+  static float zrot_prev=0;
+
   /* Get new sensor events with the readings */
   sensors_event_t a, g, temp;
 
   mpu.getEvent(&a, &g, &temp);
+
+  if (g.gyro.z != zrot_prev) {
+    zrot_prev = g.gyro.z;
+    newZrotDataReady++;
+  }
 
 //  printfLog("%d %d %d\n", a.acceleration.x, a.acceleration.y, a.acceleration.z);
 
