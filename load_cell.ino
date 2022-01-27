@@ -63,6 +63,7 @@ float getAvgForce() {
   if (newLoadDataReady) {
       noInterrupts(); // disable interrupts
       currentData = abs(LoadCell.getData());
+      newLoadDataReady_prev = newLoadDataReady;
       newLoadDataReady = 0;
       interrupts(); // enable interrupts
   }
