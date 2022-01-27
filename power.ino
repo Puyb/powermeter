@@ -126,10 +126,11 @@ static float avgRad;
 static float Zroll, Ztilt; 
 static bool halfWayReached = false;
 static bool pedaling = false;
-static float totalCrankRevs = 0; 
+static uint16_t totalCrankRevs = 0; 
 static float mps = 0;
 static float avgForce = 0;
 static int16_t power = 0;
+static long bluetoothTime = 0; // the time as reported to the bluetooth host
 
 // Initialize timers
 static long lastMeasurement = millis();
@@ -196,11 +197,7 @@ void loop() {
              (Zroll<0) && (Ztilt<0)) { 
 
       halfWayReached = false;
-
-      // Did we gather sufficient load-cell (force) data? (otherwise we'll wait another crank-rotation)
-      if ((millis()-lastMeasurement) > CRANK_MINIMUM_ROTATION_TIME) {  
-        publishAndStoreCycleInfo();
-      }
+      publishAndStoreCycleInfo();
     }
   }
 
@@ -228,7 +225,7 @@ void loop() {
 void publishAndStoreCycleInfo() 
 {
   // Get the moving average force from the load cell (library)
-  avgForce = MA_force(getAvgForce());
+  avgForce = getAvgForce();
 
   // Get the circular velocity of the rider's foot in m/s
   mps = CRANK_RADIUS * avgRad; // (2*PI*r) * avgRad/(2*PI) = r * avgRad
@@ -236,17 +233,23 @@ void publishAndStoreCycleInfo()
   // Multiply it all by 2, because we only have the sensor on 1/2 the cranks
   power = 2 * mps * avgForce;
 
-  // Estimate crank revolutions since last bluetooth-update from the last gyroscope crank-speed measurements (avgRad)
-  // Hence, we might have missed a measurement (window) using Zrot/Ztilt
-  totalCrankRevs = totalCrankRevs + ((millis() - lastBluetoothUpdate)/1000.f) * (avgRad / (2 * PI));
+  // As per Zrot/Ztilt measurement, 1 full crank-rotatation has been performed
+  totalCrankRevs++;
+
+  // Because the published cadence is determined by the delta-time (in ms),
+  // we estimate the delta-time from the last gyroscope crank-speed measurements (avgRad)
+  // assuming exactly 1 crank-rotation has passed.
+  // This provides a smoother cadence profile than using millis() to calculate the passed time.
+  float deltaTime = 2000.f * PI / avgRad; // 1000 [ms] * (2*PI) / avgRad 
+  bluetoothTime += deltaTime;
 
   // Show the values (to check if the Ztilt is close to 0 when measuring)
   if (show_values) {
-      printfLog("%.0fN, %.2fm/s, %dW, %0.0f/%0.0f, %0.0f, %d/%d\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs, newLoadDataReady_prev, newZrotDataReady);
+      printfLog("%.0fN, %.2fm/s, %dW, %0.0f/%0.0f, %d, %d/%d\n", avgForce, mps, power, Ztilt, Zroll,totalCrankRevs, newLoadDataReady_prev, newZrotDataReady);
   }
 
   // Publish the measurements to the bluetooth host
-  blePublishPower(power, (long)totalCrankRevs+0.5, millis());
+  blePublishPower(power, totalCrankRevs, bluetoothTime);
 
   // Update last session stats
   lastSessionTotalPower += power;
@@ -255,10 +258,10 @@ void publishAndStoreCycleInfo()
 
   // Store session data
   if (lastSessionDataIndex < LASTSESSIONDATAINDEX_MAX) {
-    lastSessionData[lastSessionDataIndex].totalCrankRevs = (long)totalCrankRevs+0.5;
-    lastSessionData[lastSessionDataIndex].millis = millis()-lastBluetoothUpdate;
+    lastSessionData[lastSessionDataIndex].totalCrankRevs = totalCrankRevs;
+    lastSessionData[lastSessionDataIndex].millis = deltaTime;
     lastSessionData[lastSessionDataIndex].power = (uint16_t) power;
-    lastSessionData[lastSessionDataIndex].cadence = (uint16_t) ((30*avgRad/PI)+0.5); // 30*avgRad/PI is the average cadence in RPM
+    lastSessionData[lastSessionDataIndex].cadence = (uint16_t) ((60000.f/deltaTime)+0.5); // (60*1000/deltaTime) = cadence in rpm
     lastSessionData[lastSessionDataIndex].avgForce = (uint16_t) (avgForce+0.5);
     lastSessionDataIndex++;
   }
@@ -282,9 +285,9 @@ void publishAndStoreCycleInfo_Stopped()
   else
   {
     // We are not pedaling. Report this to the bluetooth host
-    blePublishPower(0, (long)totalCrankRevs+0.5, millis()); // zero power, no cadence (resend same totalCrankRevs)
+    blePublishPower(0, totalCrankRevs, millis()); // zero power, no cadence (resend same totalCrankRevs)
     if (show_values) {
-        printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f, STOP)\n", MA_force(getAvgForce()), CRANK_RADIUS * avgRad, 0, Ztilt, Zroll);
+        printfLog("%.1fN * %.2fm/s = %dW (Z=%0.0f/%0.0f, STOP)\n", getAvgForce(), CRANK_RADIUS * avgRad, 0, Ztilt, Zroll);
     }
   }
   
@@ -405,31 +408,6 @@ void readUserInput() {
 
 float MA_cadence(float value) {
   const int nvalues = 256;            // At least the maximum number of values (#ZrotData) per crank-rotation 
-
-  static int current = 0;            // Index for current value
-  static int cvalues = 0;            // Count of values read (<= nvalues)
-  static float sum = 0;               // Rolling sum
-  static float values[nvalues];
-
-  sum += value;
-
-  // If the window is full, adjust the sum by deleting the oldest value
-  if (cvalues == nvalues)
-    sum -= values[current];
-
-  values[current] = value;          // Replace the oldest with the latest
-
-  if (++current >= nvalues)
-    current = 0;
-
-  if (cvalues < nvalues)
-    cvalues++;
-
-  return sum/cvalues;
-}
-
-float MA_force(float value) {
-  const int nvalues = 3;            // Average over the last 3 crank-rotations
 
   static int current = 0;            // Index for current value
   static int cvalues = 0;            // Count of values read (<= nvalues)
