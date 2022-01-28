@@ -98,7 +98,6 @@ void gyroSetup() {
   delay(100);
 
   // Setup sleep
-  Sleepy = 1;
   timeFirstSleepCheck=0;
 
 //  attachInterrupt(digitalPinToInterrupt(GYRO_INT_PIN), motionDetectChange, RISING); 
@@ -106,30 +105,13 @@ void gyroSetup() {
 
 void gyroCheckSleepy(bool pedaling) {
   if (!pedaling) {
-    if ((timeFirstSleepCheck > 0) && ((millis() - timeFirstSleepCheck) > MILLIS_TO_SLEEP)) 
-    {
-      enterSleepMode();
-    }
-    else
-    {
-      // Not pedaling => start sleep timer
-      if(timeFirstSleepCheck == 0)
-      {
-        int sleeptime=MILLIS_TO_SLEEP/(1000*60);
-        timeFirstSleepCheck = millis();
-//        printfLog("No activity. Going for a nap in %d minutes\n",sleeptime);
-      }
-    }
+    if ((timeFirstSleepCheck > 0) && ((millis() - timeFirstSleepCheck) > MILLIS_TO_SLEEP)) enterSleepMode();
+
+    // Not pedaling => start sleep timer
+    else if(timeFirstSleepCheck == 0) timeFirstSleepCheck = millis();
   }
-  else
-  {
-    // Pedaling => reset sleep timer
-    if(timeFirstSleepCheck > 0)
-    {
-      timeFirstSleepCheck=0;
-//      printfLog("Activity detected. Sleep timer reset\n");
-    }
-  }
+  // Pedaling => reset sleep timer
+  else if(timeFirstSleepCheck > 0) timeFirstSleepCheck=0;
 }
 
 void enterSleepMode() {

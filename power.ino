@@ -54,7 +54,6 @@
 
 // Interrupt related variables (must be volatile)
 volatile long timeFirstSleepCheck=0;
-volatile long Sleepy=0;
 volatile long connectedStart=0;
 volatile uint8_t newLoadDataReady=0;
 volatile uint8_t newLoadDataReady_prev=0;
@@ -149,7 +148,6 @@ void setup() {
   while ( !Serial && (cnt++ < 300)) delay(10);   // for nrf52840 with native usb
 
   timeFirstSleepCheck=0;
-  Sleepy = 0;
   lastSessionStart = millis();
 
   pinMode(LED_BUILTIN, OUTPUT);
@@ -186,16 +184,15 @@ void loop() {
   }
   else 
   {
-    pedaling = true;
-
     // Check if we reached the halfway point (crank pointing backward (Zroll>0)
     if (Zroll>0) {
       halfWayReached = true;
     }
     // Check if we reached the measuring position (crank pointing forward (Zroll<0) and as horizontal as possible (Ztilt~0))
     else if (halfWayReached && 
-             (Zroll<0) && (Ztilt<0)) { 
-
+             (Zroll<0) && (Ztilt<0)) 
+    { 
+      pedaling = true;
       halfWayReached = false;
       publishAndStoreCycleInfo();
     }
