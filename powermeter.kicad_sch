@@ -842,7 +842,6 @@
   (no_connect (at 88.9 88.9) (uuid 2d2ca6d4-51ac-4714-92e6-53f8a4150e8b))
   (no_connect (at 88.9 91.44) (uuid 5ab4edc4-da89-4e00-86fa-5f53fb207d53))
   (no_connect (at 220.98 59.69) (uuid 5f4f34c0-ddce-416e-8772-954c61784d05))
-  (no_connect (at 88.9 81.28) (uuid 7d53beba-8956-4ae5-9d88-1d53f325376f))
   (no_connect (at 124.46 83.82) (uuid a1e5d97b-8f18-465b-a723-1b1d5f2c9616))
 
   (wire (pts (xy 72.39 30.48) (xy 87.63 30.48))
@@ -1008,6 +1007,10 @@
   (wire (pts (xy 157.48 62.23) (xy 157.48 69.85))
     (stroke (width 0) (type default))
     (uuid 5e77a684-be2f-42f8-9bd5-b882c3f890fe)
+  )
+  (wire (pts (xy 86.36 81.28) (xy 88.9 81.28))
+    (stroke (width 0) (type default))
+    (uuid 6230d3c4-906c-400c-b4c0-4bc042e1bea8)
   )
   (wire (pts (xy 113.03 27.94) (xy 116.84 27.94))
     (stroke (width 0) (type default))
@@ -1347,6 +1350,31 @@
       (project "powermeter"
         (path "/59c6f472-5476-453e-ab78-e7815b2e4e17"
           (reference "C8") (unit 1)
+        )
+      )
+    )
+  )
+
+  (symbol (lib_id "power:GND") (at 86.36 81.28 270) (mirror x) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
+    (uuid 042f2a38-9201-4713-997a-ece4f9aafead)
+    (property "Reference" "#PWR019" (at 80.01 81.28 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Value" "GND" (at 82.55 81.28 90)
+      (effects (font (size 1.27 1.27)) (justify right))
+    )
+    (property "Footprint" "" (at 86.36 81.28 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Datasheet" "" (at 86.36 81.28 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (pin "1" (uuid c0c2cc2f-5fa0-4432-a185-0125627fada3))
+    (instances
+      (project "powermeter"
+        (path "/59c6f472-5476-453e-ab78-e7815b2e4e17"
+          (reference "#PWR019") (unit 1)
         )
       )
     )
