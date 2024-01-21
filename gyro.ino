@@ -5,7 +5,6 @@
  * by this MPU.
  */
 #include <wiring.h>
-#include "board.h"
 
 #define CALIBRATION_SAMPLES 40
 volatile int WakeupCount=0;

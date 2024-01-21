@@ -8,7 +8,6 @@
 
 #include "Adafruit_MPU6050.h"
 #include "Adafruit_Sensor.h"
-#include "board.h"
 #include <Wire.h>
 #include <bluefruit.h>
 #include <SPI.h>
@@ -24,6 +23,7 @@
 #define DEV_NAME "Cycle Power Meter"
 #define NRF52840_XXAA
 #define gn 9.80665 // gravity constant
+#define LED_CONN LED_BLUE
 
 // Virtufit Etappe I: crank length, in meters
 // (to be added to the calibration procedure!)
@@ -50,7 +50,7 @@
 // Pin-outs
 #define LED_PIN LED_BUILTIN
 #define SD_CS_PIN PIN_A3
-#define GYRO_INT_PIN A4
+#define GYRO_INT_PIN D6
 
 // Interrupt related variables (must be volatile)
 volatile long timeFirstSleepCheck=0;
@@ -95,8 +95,8 @@ lastSessionData_struct lastSessionData[LASTSESSIONDATAINDEX_MAX];
 long lastSessionDataIndex=0;
 
 //HX711 pins:
-#define HX711_dout A0 //mcu > HX711 dout pin (was: 4)
-#define HX711_sck A1 //mcu > HX711 sck pin (was: 5)
+#define HX711_dout D9 //mcu > HX711 dout pin
+#define HX711_sck D10 //mcu > HX711 sck pin
 
 //HX711 constructor:
 HX711_ADC LoadCell(HX711_dout, HX711_sck);
@@ -150,6 +150,9 @@ void setup() {
   timeFirstSleepCheck=0;
   lastSessionStart = millis();
 
+  // Battery charging current XIAO BLE
+  pinMode (PIN_CHARGING_CURRENT, OUTPUT);
+  
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
 
@@ -168,7 +171,10 @@ void setup() {
 // Main loop
 //
 void loop() {
-
+  
+  // Battery charging current XIAO BLE (HIGH: 50mA, LOW: 100mA)
+  digitalWrite(PIN_CHARGING_CURRENT, HIGH);
+  
   // Get moving average velocity in rad per second
   avgRad = MA_cadence(getZrot());
 

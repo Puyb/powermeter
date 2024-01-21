@@ -1,13 +1,13 @@
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h> // for Serial
 
-uint32_t vbat_pin = A6;             // A7 for feather nRF52832, A6 for nRF52840
+uint32_t vbat_pin = PIN_VBAT;             // A7 for feather nRF52832, A6 for nRF52840
 
 #define VBAT_MV_PER_LSB   (0.73242188F)   // 3.0V ADC range and 12-bit ADC resolution = 3000mV/4096
 
-// For nRF52840
-#define VBAT_DIVIDER      (0.5F)          // 150K + 150K voltage divider on VBAT
-#define VBAT_DIVIDER_COMP (2.0F)          // Compensation factor for the VBAT divider
+// For XIAO BLE
+#define VBAT_DIVIDER      (0.337748344F)  // 510k + 1M voltage divider on VBAT (510k / (1M + 510k)
+#define VBAT_DIVIDER_COMP (2.960784314F)  // Compensation factor for the VBAT divider
 
 // For nRF52832
 //#define VBAT_DIVIDER      (0.71275837F)   // 2M + 0.806M voltage divider on VBAT = (2M / (0.806M + 2M))
@@ -18,6 +18,9 @@ uint32_t vbat_pin = A6;             // A7 for feather nRF52832, A6 for nRF52840
 
 float readVBAT(void) {
   float raw;
+
+  // enable VBAT reading (specific to XIAO BLE, see https://wiki.seeedstudio.com/XIAO_BLE/#q3-what-are-the-considerations-when-using-xiao-nrf52840-sense-for-battery-charging )
+  digitalWrite(VBAT_ENABLE, LOW);
 
   // Set the analog reference to 3.0V (default = 3.6V)
   analogReference(AR_INTERNAL_3_0);
@@ -35,6 +38,9 @@ float readVBAT(void) {
   analogReference(AR_DEFAULT);
   analogReadResolution(10);
 
+  // disable VBAT reading (specific to XIAO BLE, see https://wiki.seeedstudio.com/XIAO_BLE/#q3-what-are-the-considerations-when-using-xiao-nrf52840-sense-for-battery-charging )
+  digitalWrite(VBAT_ENABLE, HIGH);
+
   // Convert the raw value to compensated mv, taking the resistor-
   // divider into account (providing the actual LIPO voltage)
   // ADC range is 0..3000mV and resolution is 12-bit (0..4095)
@@ -42,12 +48,12 @@ float readVBAT(void) {
 }
 
 uint8_t mvToPercent(float mvolts) {
-  if(mvolts<3300)
+  if (mvolts < 3300)
     return 0;
 
-  if(mvolts <3600) {
+  if (mvolts < 3600) {
     mvolts -= 3300;
-    return mvolts/30;
+    return mvolts / 30;
   }
 
   mvolts -= 3600;
@@ -57,4 +63,3 @@ uint8_t mvToPercent(float mvolts) {
 void setupBattery() {
   readVBAT();
 }
-
