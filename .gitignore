@@ -1,3 +1,10 @@
+calib_notes.txt
+log_decode.py
+power.code-workspace
+.vscode/arduino.json
+.vscode/c_cpp_properties.json
+sleep.ino
+
 # For PCBs designed using KiCad: https://www.kicad.org/
 # Format documentation: https://kicad.org/help/file-formats/
 

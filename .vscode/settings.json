@@ -1,0 +1,16 @@
+{
+    "nrf-connect.topdir": "\\",
+    "files.associations": {
+        "initializer_list": "cpp",
+        "deque": "cpp",
+        "list": "cpp",
+        "regex": "cpp",
+        "vector": "cpp",
+        "xhash": "cpp",
+        "xstring": "cpp",
+        "xtree": "cpp",
+        "xutility": "cpp",
+        "algorithm": "cpp",
+        "chrono": "cpp"
+    }
+}
