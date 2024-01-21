@@ -6,7 +6,7 @@
   copy /Y ..\output\power.ino.zip dist
 */
 
-#include "Adafruit_MPU6050.h"
+#include "Adafruit_LSM6DS3TRC.h"
 #include "Adafruit_Sensor.h"
 #include <Wire.h>
 #include <bluefruit.h>
@@ -95,8 +95,8 @@ lastSessionData_struct lastSessionData[LASTSESSIONDATAINDEX_MAX];
 long lastSessionDataIndex=0;
 
 //HX711 pins:
-#define HX711_dout D9 //mcu > HX711 dout pin
-#define HX711_sck D10 //mcu > HX711 sck pin
+#define HX711_dout D9 //mcu > HX711 dout pin (was: 4)
+#define HX711_sck D10 //mcu > HX711 sck pin (was: 5)
 
 //HX711 constructor:
 HX711_ADC LoadCell(HX711_dout, HX711_sck);
@@ -106,7 +106,7 @@ const int calVal_eepromAdress = 0;
 unsigned long t = 0;
 
 //MPU6050 constructor:
-Adafruit_MPU6050 mpu;
+Adafruit_LSM6DS3TRC mpu;
 
 //Internal filesystem
 using namespace Adafruit_LittleFS_Namespace;

@@ -18,19 +18,34 @@ void gyroSetup() {
   // to compile, so it's in scope.
   timeFirstSleepCheck=0;
 
-  // Try to initialize! (address = 0x68)
-  if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
+  if (!mpu.begin_I2C()) {
+    Serial.println("Failed to find LSM6DS3TR-C chip");
     while (1) {
       delay(10);
     }
   }
-  Serial.println("MPU6050 Found");
+  Serial.println("LSM6DS3TR-C Found");
 
   // disable 'wakeup' interupt
-  mpu.setMotionInterrupt(false);
+  mpu.enableWakeup(false);
 
-  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setAccelRange(LSM6DS_ACCEL_RANGE_8_G);
+  Serial.print("Accelerometer range set to: ");
+  switch (mpu.getAccelRange()) {
+  case LSM6DS_ACCEL_RANGE_2_G:
+    Serial.println("+-2G");
+    break;
+  case LSM6DS_ACCEL_RANGE_4_G:
+    Serial.println("+-4G");
+    break;
+  case LSM6DS_ACCEL_RANGE_8_G:
+    Serial.println("+-8G");
+    break;
+  case LSM6DS_ACCEL_RANGE_16_G:
+    Serial.println("+-16G");
+    break;
+  }
+  /*mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
   Serial.print("Accelerometer range set to: ");
   switch (mpu.getAccelerometerRange()) {
   case MPU6050_RANGE_2_G:
@@ -45,8 +60,29 @@ void gyroSetup() {
   case MPU6050_RANGE_16_G:
     Serial.println("+-16G");
     break;
+  }*/
+  mpu.setGyroRange(LSM6DS_GYRO_RANGE_1000_DPS);
+  Serial.print("Gyro range set to: ");
+  switch (mpu.getGyroRange()) {
+  case LSM6DS_GYRO_RANGE_125_DPS:
+    Serial.println("125 degrees/s");
+    break;
+  case LSM6DS_GYRO_RANGE_250_DPS:
+    Serial.println("250 degrees/s");
+    break;
+  case LSM6DS_GYRO_RANGE_500_DPS:
+    Serial.println("500 degrees/s");
+    break;
+  case LSM6DS_GYRO_RANGE_1000_DPS:
+    Serial.println("1000 degrees/s");
+    break;
+  case LSM6DS_GYRO_RANGE_2000_DPS:
+    Serial.println("2000 degrees/s");
+    break;
+  case ISM330DHCX_GYRO_RANGE_4000_DPS:
+    break; // unsupported range for the DS33
   }
-  mpu.setGyroRange(MPU6050_RANGE_1000_DEG);
+  /*mpu.setGyroRange(MPU6050_RANGE_1000_DEG);
   Serial.print("Gyro range set to: ");
   switch (mpu.getGyroRange()) {
   case MPU6050_RANGE_250_DEG:
@@ -61,9 +97,9 @@ void gyroSetup() {
   case MPU6050_RANGE_2000_DEG:
     Serial.println("+- 2000 deg/s");
     break;
-  }
+  }*/
 
-  mpu.setFilterBandwidth(MPU6050_BAND_260_HZ);
+  /*mpu.setFilterBandwidth(MPU6050_BAND_260_HZ);
   Serial.print("Filter bandwidth set to: ");
   switch (mpu.getFilterBandwidth()) {
   case MPU6050_BAND_260_HZ:
@@ -87,11 +123,12 @@ void gyroSetup() {
   case MPU6050_BAND_5_HZ:
     Serial.println("5 Hz");
     break;
-  }
+  }*/
 
+  /*
   mpu.setHighPassFilter(MPU6050_HIGHPASS_UNUSED);
   mpu.setClock(MPU6050_INTR_8MHz); // Keep clock running on internal clock 
-
+  */
 
   Serial.println("");
   delay(100);
@@ -125,14 +162,15 @@ void enterSleepMode() {
   LoadCell.powerDown();
 
   // Put MPU6050 in low power (wild guess, to be measured)
-  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+  /*mpu.setGyroRange(MPU6050_RANGE_250_DEG);
   mpu.setHighPassFilter(MPU6050_HIGHPASS_UNUSED);
   mpu.setFilterBandwidth(MPU6050_BAND_260_HZ); ///< Docs imply this disables the filter
-
+  */
   // Set sample rate = GYROSCOPE Sample Rate / (1 + SampleRateDivisor)
   //                 = 8kHz/(1 + 999) = 8 Hz
-  mpu.setSampleRateDivisor(999);
-
+  // mpu.setSampleRateDivisor(999);
+  mpu.setAccelDataRate(LSM6DS_RATE_12_5_HZ);
+  mpu.setGyroDataRate(LSM6DS_RATE_12_5_HZ);
 
  /*
  *          |   ACCELEROMETER    |           GYROSCOPE
@@ -160,13 +198,15 @@ void enterSleepMode() {
 */
 
   // Set zero motion detection interrupt at gyro MPU6050
-  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
+  /*mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
   mpu.setMotionDetectionThreshold(1);
   mpu.setMotionDetectionDuration(20);
   mpu.setInterruptPinLatch(false);  
   mpu.setInterruptPinPolarity(false); // active high
   mpu.setMotionInterrupt(true);
-
+  */
+  mpu.enableWakeup(true, 20, 1);
+  
   // Enable wake-up by motion interrupt and power-down the Arduino board
   pinMode(GYRO_INT_PIN, INPUT_PULLUP);
   nrf_gpio_cfg_input(2,NRF_GPIO_PIN_NOPULL); 
@@ -212,4 +252,3 @@ float getTemperature() {
   mpu.getEvent(&a, &g, &temp);
   return(temp.temperature);
 }
-
